@@ -1,0 +1,71 @@
+{
+ "muestras": {
+  "train": 1600,
+  "val": 400,
+  "test": 800
+ },
+ "mejor_epoca": 321,
+ "val_loss": 0.1111,
+ "test_mlp": {
+  "ruido": {
+   "exactitud": 0.8825,
+   "precision": 0.8906,
+   "recall": 0.868,
+   "f1": 0.8792
+  },
+  "desenfoque": {
+   "exactitud": 0.9487,
+   "precision": 0.9409,
+   "recall": 0.9531,
+   "f1": 0.947
+  },
+  "compresion": {
+   "exactitud": 1.0,
+   "precision": 1.0,
+   "recall": 1.0,
+   "f1": 1.0
+  },
+  "todas_correctas": 0.8337
+ },
+ "test_umbral_simple": {
+  "ruido": {
+   "exactitud": 0.7875,
+   "precision": 0.7995,
+   "recall": 0.7589,
+   "f1": 0.7786
+  },
+  "desenfoque": {
+   "exactitud": 0.7875,
+   "precision": 0.9652,
+   "recall": 0.5781,
+   "f1": 0.7231
+  },
+  "compresion": {
+   "exactitud": 0.9975,
+   "precision": 1.0,
+   "recall": 0.9952,
+   "f1": 0.9976
+  },
+  "todas_correctas": 0.6038
+ },
+ "umbrales_simples": [
+  {
+   "etiqueta": "ruido",
+   "caracteristica": "densidad_bordes_canny",
+   "umbral": 0.1888,
+   "sentido": 1
+  },
+  {
+   "etiqueta": "desenfoque",
+   "caracteristica": "nitidez_log_var_laplaciano",
+   "umbral": 2.3818,
+   "sentido": -1
+  },
+  {
+   "etiqueta": "compresion",
+   "caracteristica": "bloques_jpeg",
+   "umbral": 1.2169,
+   "sentido": 1
+  }
+ ]
+}
