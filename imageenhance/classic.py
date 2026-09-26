@@ -49,9 +49,8 @@ def box_kernel(size: int) -> np.ndarray:
 
 def gaussian_filter(img: np.ndarray, ksize: int = 5, sigma: float = 1.0, own: bool = False) -> np.ndarray:
     """Suavizado gaussiano. own=True usa nuestra conv2d; own=False usa OpenCV (mismo resultado, más rápido)."""
-    if own:
-        return conv2d(img, gaussian_kernel(ksize, sigma))
-    return cv2.GaussianBlur(img.astype(np.float32), (ksize, ksize), sigma)
+    out = conv2d(img, gaussian_kernel(ksize, sigma)) if own else cv2.GaussianBlur(img.astype(np.float32), (ksize, ksize), sigma)
+    return np.clip(out, 0.0, 1.0)  # el redondeo en float puede dar 1.0000001
 
 
 def median_filter(img: np.ndarray, ksize: int = 3) -> np.ndarray:
