@@ -1,0 +1,50 @@
+import cv2
+import numpy as np
+
+from imageenhance import io_utils as io
+from imageenhance import noise
+
+
+def test_uint8_float_ida_y_vuelta(img):
+    u8 = io.to_uint8(img)
+    assert u8.dtype == np.uint8
+    assert np.abs(io.to_float(u8) - img).max() <= 0.5 / 255 + 1e-6
+
+
+def test_to_uint8_hace_clip_y_no_da_la_vuelta():
+    assert io.to_uint8(np.array([-0.04, 1.2], np.float32)).tolist() == [0, 255]
+
+
+def test_bgr_rgb_invierte_canales(img):
+    rgb = io.bgr_to_rgb(img)
+    assert np.array_equal(rgb[..., 0], img[..., 2]) and np.array_equal(io.rgb_to_bgr(rgb), img)
+
+
+def test_gris_coincide_con_opencv(img):
+    u8 = io.to_uint8(img)
+    diff = np.abs(io.to_gray(u8) - cv2.cvtColor(u8, cv2.COLOR_BGR2GRAY).astype(np.float32))
+    assert diff.max() <= 0.5 + 1e-3  # solo redondeo, como en la Sesión 02
+
+
+def test_guardar_y_cargar_con_tildes(tmp_path, img):
+    p = tmp_path / "prueba_señal.png"
+    io.save_bgr(p, img)
+    assert np.array_equal(io.load_bgr(p), io.to_uint8(img))
+
+
+def test_gaussiano_reproducible_y_con_sigma_correcto(img):
+    a = noise.add_gaussian(img, 25, seed=7, clip=False)
+    b = noise.add_gaussian(img, 25, seed=7, clip=False)
+    c = noise.add_gaussian(img, 25, seed=8, clip=False)
+    assert np.array_equal(a, b) and not np.array_equal(a, c)
+    assert abs((a - img).std() * 255 - 25) < 1.0
+    clipped = noise.add_gaussian(img, 50, seed=7)
+    assert clipped.min() >= 0 and clipped.max() <= 1
+
+
+def test_sal_pimienta_proporcion_y_no_modifica_original(img):
+    orig = img.copy()
+    sp = noise.add_salt_pepper(img, 0.05, seed=42)
+    frac = np.any(sp != img, axis=-1).mean()
+    assert np.array_equal(img, orig)
+    assert 0.03 < frac < 0.06
