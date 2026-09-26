@@ -1,0 +1,35 @@
+{
+ "split": "val",
+ "images": 100,
+ "criterion": "psnr",
+ "best": {
+  "gaussian_15_median": {
+   "ksize": 3
+  },
+  "gaussian_15_gaussian": {
+   "ksize": 7,
+   "sigma": 0.8
+  },
+  "gaussian_25_median": {
+   "ksize": 3
+  },
+  "gaussian_25_gaussian": {
+   "ksize": 7,
+   "sigma": 0.8
+  },
+  "gaussian_50_median": {
+   "ksize": 7
+  },
+  "gaussian_50_gaussian": {
+   "ksize": 11,
+   "sigma": 1.5
+  },
+  "salt_pepper_0.05_median": {
+   "ksize": 3
+  },
+  "salt_pepper_0.05_gaussian": {
+   "ksize": 9,
+   "sigma": 1.1
+  }
+ }
+}

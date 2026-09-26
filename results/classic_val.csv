@@ -1,0 +1,41 @@
+noise,level,method,params,psnr,ssim
+gaussian,15,sin_filtro,{},24.8246,0.5800
+gaussian,15,median,"{""ksize"": 3}",26.7526,0.6988
+gaussian,15,median,"{""ksize"": 5}",25.1998,0.6373
+gaussian,15,median,"{""ksize"": 7}",24.2048,0.5889
+gaussian,15,gaussian,"{""ksize"": 5, ""sigma"": 0.5}",27.7904,0.7075
+gaussian,15,gaussian,"{""ksize"": 7, ""sigma"": 0.8}",27.9018,0.7768
+gaussian,15,gaussian,"{""ksize"": 9, ""sigma"": 1.1}",26.6776,0.7462
+gaussian,15,gaussian,"{""ksize"": 11, ""sigma"": 1.5}",25.4312,0.6903
+gaussian,15,gaussian,"{""ksize"": 13, ""sigma"": 2.0}",24.3838,0.6314
+gaussian,15,gaussian,"{""ksize"": 17, ""sigma"": 2.5}",23.6441,0.5877
+gaussian,25,sin_filtro,{},20.5269,0.3993
+gaussian,25,median,"{""ksize"": 3}",24.8152,0.5753
+gaussian,25,median,"{""ksize"": 5}",24.4466,0.5754
+gaussian,25,median,"{""ksize"": 7}",23.8073,0.5545
+gaussian,25,gaussian,"{""ksize"": 5, ""sigma"": 0.5}",23.9525,0.5325
+gaussian,25,gaussian,"{""ksize"": 7, ""sigma"": 0.8}",26.0582,0.6664
+gaussian,25,gaussian,"{""ksize"": 9, ""sigma"": 1.1}",25.7126,0.6797
+gaussian,25,gaussian,"{""ksize"": 11, ""sigma"": 1.5}",24.9287,0.6553
+gaussian,25,gaussian,"{""ksize"": 13, ""sigma"": 2.0}",24.0956,0.6135
+gaussian,25,gaussian,"{""ksize"": 17, ""sigma"": 2.5}",23.4466,0.5769
+gaussian,50,sin_filtro,{},14.9977,0.1999
+gaussian,50,median,"{""ksize"": 3}",20.9119,0.3653
+gaussian,50,median,"{""ksize"": 5}",22.4117,0.4295
+gaussian,50,median,"{""ksize"": 7}",22.6170,0.4602
+gaussian,50,gaussian,"{""ksize"": 5, ""sigma"": 0.5}",18.5926,0.3009
+gaussian,50,gaussian,"{""ksize"": 7, ""sigma"": 0.8}",22.1994,0.4546
+gaussian,50,gaussian,"{""ksize"": 9, ""sigma"": 1.1}",23.0536,0.5178
+gaussian,50,gaussian,"{""ksize"": 11, ""sigma"": 1.5}",23.1853,0.5509
+gaussian,50,gaussian,"{""ksize"": 13, ""sigma"": 2.0}",22.9106,0.5526
+gaussian,50,gaussian,"{""ksize"": 17, ""sigma"": 2.5}",22.5457,0.5384
+salt_pepper,0.05,sin_filtro,{},17.9940,0.4312
+salt_pepper,0.05,median,"{""ksize"": 3}",28.6155,0.8326
+salt_pepper,0.05,median,"{""ksize"": 5}",25.7178,0.6910
+salt_pepper,0.05,median,"{""ksize"": 7}",24.4409,0.6196
+salt_pepper,0.05,gaussian,"{""ksize"": 5, ""sigma"": 0.5}",21.5535,0.5318
+salt_pepper,0.05,gaussian,"{""ksize"": 7, ""sigma"": 0.8}",24.5317,0.6193
+salt_pepper,0.05,gaussian,"{""ksize"": 9, ""sigma"": 1.1}",24.7644,0.6308
+salt_pepper,0.05,gaussian,"{""ksize"": 11, ""sigma"": 1.5}",24.3644,0.6204
+salt_pepper,0.05,gaussian,"{""ksize"": 13, ""sigma"": 2.0}",23.7385,0.5934
+salt_pepper,0.05,gaussian,"{""ksize"": 17, ""sigma"": 2.5}",23.1854,0.5650
