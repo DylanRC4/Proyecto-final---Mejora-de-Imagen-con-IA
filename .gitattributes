@@ -1,0 +1,12 @@
+# Normaliza finales de línea: LF en el repositorio, nativo en cada sistema
+* text=auto
+# Archivos binarios: nunca convertir
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.bmp binary
+*.tif binary
+*.tiff binary
+*.pt binary
+*.pth binary
+*.npz binary

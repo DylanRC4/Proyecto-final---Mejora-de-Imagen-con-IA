@@ -1,0 +1,9 @@
+# Probado con Python 3.14 en Windows (compatible con 3.12+)
+# En Windows, "pip install torch" desde PyPI instala la version CPU.
+numpy>=2.1
+opencv-python-headless>=4.10
+torch>=2.6
+streamlit>=1.40
+matplotlib>=3.9
+scikit-image>=0.25   # solo para validar nuestro SSIM en los tests
+pytest>=8
