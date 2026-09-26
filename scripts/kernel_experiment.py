@@ -100,7 +100,7 @@ def main() -> None:
     for ax, (title, k) in zip(axes, panels):
         ax.imshow(k, cmap="RdBu_r", vmin=-vmax, vmax=vmax)
         for (i, j), v in np.ndenumerate(k):
-            ax.text(j, i, f"{v:.3f}", ha="center", va="center", fontsize=8)
+            ax.text(j, i, f"{v:.3f}", ha="center", va="center", fontsize=8, color="white" if abs(v) > 0.6 * vmax else "black")
         ax.set_title(title)
         ax.axis("off")
     if first is not None:
