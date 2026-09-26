@@ -17,7 +17,7 @@ FEATURES = ["ruido_sigma", "nitidez_log_var_laplaciano", "alta_frec_relativa", "
             "bloques_jpeg", "brillo", "contraste", "percentil_1", "percentil_99",
             "dominante_media", "dominante_brillantes"]
 LABELS = ["ruido", "desenfoque", "compresion"]
-WORK_SIDE = 512  # escala fija de análisis (BSDS500 mide 481 px): las medidas no dependen del tamaño
+CROP = 768  # recorte central para las medidas de detalle (BSDS500 mide 481 px: cabe completa)
 
 
 def blockiness(gray: np.ndarray) -> float:
@@ -28,23 +28,25 @@ def blockiness(gray: np.ndarray) -> float:
 
 
 def features(img: np.ndarray) -> np.ndarray:
-    """Vector de 11 características de una imagen BGR float [0, 1] en su resolución ORIGINAL.
+    """Vector de 11 características de una imagen BGR float [0, 1] a la resolución en que se va a procesar.
 
-    Los bloques JPEG se miden en la resolución original (al reducir la foto se pierde la rejilla
-    de 8x8); el resto, a una escala fija de WORK_SIDE píxeles.
+    Ruido, nitidez, bordes y bloques JPEG se miden en un recorte central SIN reducir la foto:
+    reducirla promedia píxeles vecinos y borra justo el ruido y los bloques que buscamos.
+    Brillo, contraste y color son globales, así que se miden sobre la foto reducida a 512 px.
     """
-    y, x = (max(0, (d - 1024) // 2) for d in img.shape[:2])
-    block = blockiness(to_gray(img[y:y + 1024, x:x + 1024]) * 255)  # recorte central para no tardar
-    small = resize_max(img, WORK_SIDE)
-    g = to_gray(small).astype(np.float64) * 255  # float64: la derivada sale del rango (Sesión 05)
+    y, x = (max(0, (d - CROP) // 2) for d in img.shape[:2])
+    crop = img[y:y + CROP, x:x + CROP]
+    g = to_gray(crop).astype(np.float64) * 255  # float64: la derivada sale del rango (Sesión 05)
     lap = cv2.Laplacian(g, cv2.CV_64F)  # segunda derivada (Sesión 05): responde a bordes finos y ruido
     grad = np.hypot(cv2.Sobel(g, cv2.CV_64F, 1, 0), cv2.Sobel(g, cv2.CV_64F, 0, 1))
     edges = cv2.Canny(np.clip(g, 0, 255).astype(np.uint8), 50, 150)  # umbrales de la Sesión 05
+    small = resize_max(img, 512)
+    gs = to_gray(small)
     means = small.reshape(-1, 3).mean(axis=0)
-    bright = small[g >= np.percentile(g, 95)].mean(axis=0)  # los píxeles más claros suelen ser blancos o grises
-    p1, p99 = np.percentile(g, [1, 99]) / 255
-    return np.array([estimate_noise_sigma(small), np.log10(lap.var() + 1), np.abs(lap).mean() / (grad.mean() + 1e-6),
-                     (edges > 0).mean(), block, g.mean() / 255, g.std() / 255, p1, p99,
+    bright = small[gs >= np.percentile(gs, 95)].mean(axis=0)  # los píxeles más claros suelen ser blancos o grises
+    p1, p99 = np.percentile(gs, [1, 99])
+    return np.array([estimate_noise_sigma(crop), np.log10(lap.var() + 1), np.abs(lap).mean() / (grad.mean() + 1e-6),
+                     (edges > 0).mean(), blockiness(g), gs.mean(), gs.std(), p1, p99,
                      np.ptp(means) / (means.mean() + 1e-6), np.ptp(bright) / (bright.mean() + 1e-6)], dtype=np.float32)
 
 

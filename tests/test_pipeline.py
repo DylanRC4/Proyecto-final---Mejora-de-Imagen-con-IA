@@ -35,3 +35,8 @@ def test_ampliar_y_respaldo_sin_modelo_externo(img, models):
     assert out.shape[:2] == (img.shape[0] * 2, img.shape[1] * 2)
     out, log = P.run(img, ["detalle"], {"denoiser": models["denoiser"], "esrgan": None})
     assert out.shape == img.shape and "no disponible" in log[0]["detalle"]
+
+
+def test_intensidad_cero_de_real_esrgan_devuelve_la_entrada(img, models):
+    out, _ = P.run(img, ["detalle"], models, strength=0.0)
+    assert np.allclose(out, img)

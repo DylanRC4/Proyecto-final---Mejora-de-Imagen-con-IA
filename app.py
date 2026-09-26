@@ -1,10 +1,10 @@
-"""ImageEnhance AI — interfaz de demostración.   Ejecutar:  streamlit run app.py
+"""ImageEnhance AI — interfaz.   Ejecutar:  streamlit run app.py   (o doble clic en iniciar.bat)
 
-Convención: todo se procesa en float32 [0, 1] y en orden BGR (como lo carga OpenCV y como se
-entrenó la CNN); solo se convierte a RGB para mostrar (Sesión 02).
+Todo se procesa en float32 [0, 1] y en orden BGR (como carga OpenCV y como se entrenaron los
+modelos); solo se convierte a RGB para mostrar (Sesión 02).
 """
+import hashlib
 import json
-import time
 from pathlib import Path
 
 import cv2
@@ -12,180 +12,236 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from imageenhance import analysis, classic, metrics, noise
-from imageenhance.io_utils import bgr_to_rgb, decode_bytes, load_bgr, resize_max, to_float, to_uint8
+from imageenhance import analysis, classic, enhance, metrics, noise, pipeline
+from imageenhance.io_utils import bgr_to_rgb, decode_bytes, resize_max, to_float, to_uint8
 
 ROOT = Path(__file__).resolve().parent
-MODEL_PATH = ROOT / "models" / "denoise_cnn.pt"
-EXAMPLES = ROOT / "data" / "raw" / "bsds500" / "test"
+EXAMPLE_DIRS = {"demo": ROOT / "data" / "demo", "bsds": ROOT / "data" / "raw" / "bsds500" / "test"}
+NOMBRES = {"ruido": "Ruido", "detalle": "Detalle (desenfoque / compresión)", "luz": "Iluminación",
+           "contraste": "Contraste", "color": "Color", "nitidez": "Nitidez extra", "ampliar": "Ampliar resolución"}
 
 st.set_page_config(page_title="ImageEnhance AI", layout="wide")
 
 
-@st.cache_resource(show_spinner="Cargando la CNN…")
-def load_model(path: str, mtime: float):
-    from imageenhance import model as M
-    return M.load(path)
+@st.cache_resource(show_spinner="Cargando modelos…")
+def load_models():
+    from imageenhance import diagnosis, external, model
+    m = {"denoiser": None, "diagnoser": None, "esrgan": None, "meta": {}}
+    if (ROOT / "models" / "denoise_cnn.pt").exists():
+        m["denoiser"], m["meta"] = model.load(ROOT / "models" / "denoise_cnn.pt")
+    if (ROOT / "models" / "diagnosis_mlp.pt").exists():
+        m["diagnoser"] = diagnosis.Diagnoser(ROOT / "models" / "diagnosis_mlp.pt")
+    if external.ESRGAN_PATH.exists():
+        m["esrgan"] = external.load_esrgan()
+    return m
 
 
-@st.cache_data(show_spinner="Procesando con la CNN…")
-def run_cnn(img: np.ndarray, mtime: float) -> tuple[np.ndarray, float]:
-    from imageenhance import model as M
-    net, _ = load_model(str(MODEL_PATH), mtime)
-    t0 = time.perf_counter()
-    out = M.denoise(net, img)
-    return out, time.perf_counter() - t0
+@st.cache_data(show_spinner="Procesando…", max_entries=8)
+def run_steps(img: np.ndarray, steps: tuple, factor: int = 2, amount: float = 0.6, strength: float = 0.7):
+    return pipeline.run(img, list(steps), load_models(), factor=factor, amount=amount, strength=strength)
 
 
-@st.cache_data
-def run_classic(img: np.ndarray, method: str, params: tuple, own: bool = False) -> tuple[np.ndarray, float]:
-    t0 = time.perf_counter()
-    kw = dict(params)
-    out = classic.gaussian_filter(img, own=own, **kw) if method == "gaussian" else classic.apply(img, method, **kw)
-    return out, time.perf_counter() - t0
+@st.cache_data(show_spinner="Leyendo la imagen…", max_entries=4)
+def prepare(raw: bytes, max_side: int) -> np.ndarray:
+    """Decodifica y reduce UNA vez; sin caché, una foto de 74 MB se decodificaría en cada clic."""
+    return to_float(resize_max(decode_bytes(raw), max_side))
 
 
-def rgb(img: np.ndarray) -> np.ndarray:
+def rgb(img):
     return bgr_to_rgb(to_uint8(img))
 
 
-def classic_defaults() -> dict:
-    p = ROOT / "results" / "classic_params.json"
-    return json.loads(p.read_text("utf-8"))["best"] if p.exists() else {}
+def before_after(a, b, cap_a="Original", cap_b="Mejorada"):
+    c1, c2 = st.columns(2)
+    c1.image(rgb(a), caption=f"{cap_a} — {a.shape[1]}×{a.shape[0]} px", width="stretch")
+    c2.image(rgb(b), caption=f"{cap_b} — {b.shape[1]}×{b.shape[0]} px", width="stretch")
 
 
-# ---------------- Barra lateral: entrada y modo ----------------
+def reference_metrics(ref, before, after):
+    if ref is None:
+        st.info("Foto real: no existe la versión limpia, así que PSNR y SSIM no se pueden calcular. Compara a la vista.")
+        return
+    if after.shape != ref.shape:
+        st.info("La imagen cambió de tamaño: PSNR y SSIM solo se comparan a la misma resolución.")
+        return
+    rows = {"Entrada degradada": metrics.evaluate(ref, before), "Resultado": metrics.evaluate(ref, after)}
+    st.dataframe(pd.DataFrame(rows).T.rename(columns={"psnr": "PSNR (dB) ↑", "ssim": "SSIM ↑"}).round(3), width="stretch")
+    st.caption("Válido porque la degradación la aplicamos nosotros sobre una foto limpia que conocemos.")
+
+
+def download(img, name, key):
+    ok, buf = cv2.imencode(".png", to_uint8(img))
+    st.download_button("Descargar PNG", buf.tobytes(), file_name=f"{Path(name).stem}_mejorada.png", mime="image/png", key=key)
+
+
+models = load_models()
+
+# ---------------- Barra lateral ----------------
 st.sidebar.title("ImageEnhance AI")
-up = st.sidebar.file_uploader("Cargar fotografía", type=["jpg", "jpeg", "png", "bmp", "webp"])
-examples = sorted(p.name for p in EXAMPLES.glob("*.jpg"))[:30] if EXAMPLES.exists() else []
+up = st.sidebar.file_uploader("Cargar fotografía", type=["jpg", "jpeg", "png", "bmp", "webp", "tif", "tiff"])
+examples = [f"{k}/{p.name}" for k, d in EXAMPLE_DIRS.items() if d.exists()
+            for p in sorted(d.iterdir())[: (40 if k == "demo" else 20)] if p.suffix.lower() in (".jpg", ".jpeg", ".png")]
 if up is not None:
-    src, src_name = decode_bytes(up.getvalue()), up.name
+    raw, src_name = up.getvalue(), up.name
 elif examples:
-    src_name = st.sidebar.selectbox("…o usar una foto de prueba (BSDS500)", examples)
-    src = load_bgr(EXAMPLES / src_name)
+    choice = st.sidebar.selectbox("…o una foto de ejemplo", examples, key="ejemplo")
+    raw, src_name = (EXAMPLE_DIRS[choice.split("/")[0]] / choice.split("/", 1)[1]).read_bytes(), choice
 else:
     st.info("Carga una fotografía en la barra lateral para comenzar.")
     st.stop()
 
-max_side = st.sidebar.slider("Lado máximo para procesar (px)", 256, 1600, 800, 64,
-                             help="La CNN corre en CPU: imágenes más pequeñas se procesan más rápido.")
-mode = st.sidebar.radio("Modo", ["Experimento: agregar ruido controlado", "Foto real (sin referencia)"])
+max_side = st.sidebar.slider("Lado máximo para procesar (px)", 256, 2048, 1280, 64,
+                             help="Todo corre en CPU: fotos más pequeñas se procesan más rápido.")
+mode = st.sidebar.radio("Modo", ["Foto real (sin referencia)", "Experimento: degradar una foto limpia"], key="modo")
 experiment = mode.startswith("Experimento")
 if experiment:
-    kind = st.sidebar.selectbox("Tipo de ruido", ["gaussian", "salt_pepper"],
-                                format_func=lambda k: {"gaussian": "Gaussiano", "salt_pepper": "Sal y pimienta"}[k])
-    level = (st.sidebar.slider("Sigma (escala 0-255)", 5, 50, 25) if kind == "gaussian"
-             else st.sidebar.slider("Fracción de píxeles", 0.01, 0.20, 0.05, 0.01))
+    kind = st.sidebar.selectbox("Degradación", ["gaussian", "salt_pepper", "blur", "jpeg"], key="degradacion",
+                                format_func={"gaussian": "Ruido gaussiano", "salt_pepper": "Sal y pimienta",
+                                             "blur": "Desenfoque", "jpeg": "Compresión JPEG"}.get)
+    level = {"gaussian": lambda: st.sidebar.slider("Sigma del ruido (0-255)", 5, 50, 25),
+             "salt_pepper": lambda: st.sidebar.slider("Fracción de píxeles", 0.01, 0.20, 0.05, 0.01),
+             "blur": lambda: st.sidebar.slider("Sigma del desenfoque", 0.5, 3.0, 1.5, 0.1),
+             "jpeg": lambda: st.sidebar.slider("Calidad JPEG (menor = peor)", 5, 60, 15)}[kind]()
     seed = int(st.sidebar.number_input("Semilla", 0, 10_000, 42))
 
-original = to_float(resize_max(src, max_side))
-if experiment:
-    reference, work = original, noise.degrade(original, kind, level, seed)
-else:
-    reference, work = None, original
+st.sidebar.markdown("**Modelos**")
+for label, key, origin in [("CNN de ruido", "denoiser", "nuestra"), ("MLP de diagnóstico", "diagnoser", "nuestra"),
+                           ("Real-ESRGAN", "esrgan", "externo")]:
+    st.sidebar.caption(f"{'✅' if models[key] is not None else '❌'} {label} ({origin})")
+if models["esrgan"] is None:
+    st.sidebar.caption("Para activar Real-ESRGAN: `python scripts/download_models.py`")
+
+original = prepare(raw, max_side)
+reference, work = (original, noise.degrade(original, kind, level, seed)) if experiment else (None, original)
+img_key = hashlib.md5(work.tobytes()).hexdigest()
 
 st.title("ImageEnhance AI")
-st.caption("Eliminación de ruido con filtros clásicos y una CNN residual entrenada desde cero. "
+st.caption(f"Mejora de fotografías con IA propia, modelos externos identificados y procesamiento clásico. "
            f"Imagen: {src_name} — {work.shape[1]}×{work.shape[0]} px.")
-if experiment and kind == "salt_pepper":
-    st.warning("La CNN se entrenó solo con ruido gaussiano: con sal y pimienta se espera que la mediana gane.")
+tab_auto, tab_tools, tab_an, tab_tec = st.tabs(["Mejora automática", "Herramientas", "Análisis", "Comparación técnica"])
 
-tab_a, tab_c, tab_n, tab_cmp, tab_adj = st.tabs(["1. Análisis", "2. Filtros clásicos", "3. CNN", "4. Comparación", "5. Ajustes y descarga"])
+# ---------------- 1. Mejora automática ----------------
+with tab_auto:
+    if models["diagnoser"] is None or models["denoiser"] is None:
+        st.warning("Faltan modelos entrenados en models/. Ejecuta scripts/train.py y scripts/train_diagnosis.py.")
+    else:
+        diag = models["diagnoser"](work)  # se diagnostica a la misma resolución que se va a procesar
+        probs, prob = diag["problemas"], diag["prob"]
+        st.subheader("1. Diagnóstico")
+        c1, c2 = st.columns(2)
+        c1.markdown("**Clasificador MLP (nuestra IA)**")
+        c1.dataframe(pd.DataFrame({"probabilidad": [f"{prob[k] * 100:.0f} %" for k in prob],
+                                   "detectado": ["sí" if probs[k] else "no" for k in prob]}, index=list(prob)), width="stretch")
+        c2.markdown("**Reglas sobre el histograma (clásico)**")
+        f = diag["features"]
+        c2.dataframe(pd.DataFrame({"medida": [f"brillo {f['brillo']:.2f}", f"brillo {f['brillo']:.2f}",
+                                              f"rango {f['percentil_99'] - f['percentil_1']:.2f}",
+                                              f"{f['dominante_media']:.2f} / {f['dominante_brillantes']:.2f}"],
+                                   "detectado": ["sí" if probs[k] else "no" for k in
+                                                 ("oscura", "sobreexpuesta", "poco_contraste", "dominante_color")]},
+                                  index=["oscura", "sobreexpuesta", "poco contraste", "dominante de color"]), width="stretch")
+        plan = pipeline.plan(probs)
+        st.subheader("2. Tratamiento")
+        steps = st.multiselect("Pasos a aplicar (propuestos por el diagnóstico; puedes cambiarlos)", pipeline.ORDEN,
+                               default=plan, format_func=NOMBRES.get, key=f"pasos_{img_key}")
+        factor = st.radio("Ampliación", [2, 4], horizontal=True, format_func=lambda x: f"×{x}", key="factor_auto") \
+            if "ampliar" in steps else 2
+        strength = st.slider("Intensidad de Real-ESRGAN en el paso de detalle", 0.0, 1.0, 0.7, 0.1, key="fuerza_auto",
+                             help="1 = modelo puro (muy nítido, a veces aspecto 'pintado'); menos = mezcla con la original.") \
+            if "detalle" in steps else 0.7
+        if not plan:
+            st.success("El diagnóstico no encontró problemas claros. Puedes elegir pasos manualmente.")
+        if st.button("Mejorar automáticamente", type="primary", key="auto_btn", disabled=not steps):
+            st.session_state["auto"] = (img_key, tuple(steps), factor, strength)
+        if st.session_state.get("auto") and st.session_state["auto"][0] == img_key:
+            _, s, fac, fuerza = st.session_state["auto"]
+            out, log = run_steps(work, s, fac, 0.6, fuerza)
+            st.subheader("3. Resultado")
+            before_after(work, out)
+            st.dataframe(pd.DataFrame(log).set_index("paso").rename(index=NOMBRES), width="stretch")
+            reference_metrics(reference, work, out)
+            download(out, src_name, "dl_auto")
 
-# ---------------- 1. Análisis ----------------
-with tab_a:
+# ---------------- 2. Herramientas individuales ----------------
+with tab_tools:
+    st.caption("Activa las herramientas que quieras. Se aplican en el orden correcto: ruido → detalle → luz → contraste → color → nitidez → ampliar.")
+    c1, c2, c3 = st.columns(3)
+    t_noise = c1.selectbox("Reducir ruido", ["No", "Nuestra CNN", "Mediana", "Gaussiano"], key="t_ruido")
+    t_detail = c1.slider("Restaurar detalle (Real-ESRGAN, externo): intensidad", 0.0, 1.0, 0.0, 0.1,
+                         disabled=models["esrgan"] is None, key="t_detalle")
+    t_light = c2.selectbox("Iluminación", ["No", "Automática (gamma)", "Manual"], key="t_luz")
+    gamma = c2.slider("γ (menor que 1 aclara)", 0.3, 3.0, 1.0, 0.05, key="t_gamma") if t_light == "Manual" else None
+    t_contrast = c2.selectbox("Contraste", ["No", "Niveles automáticos", "CLAHE (por zonas)"], key="t_contraste")
+    t_color = c3.slider("Balance de blancos (intensidad)", 0.0, 1.0, 0.0, 0.1, key="t_color")
+    t_sharp = c3.slider("Nitidez (máscara de desenfoque)", 0.0, 2.0, 0.0, 0.1, key="t_nitidez")
+    t_up = c3.selectbox("Ampliar resolución (Real-ESRGAN)", ["No", "×2", "×4"], disabled=models["esrgan"] is None, key="t_ampliar")
+    out, log = work, []
+    if t_noise == "Nuestra CNN" and models["denoiser"] is not None:
+        out, lg = run_steps(out, ("ruido",), 2, 0.6); log += lg
+    elif t_noise == "Mediana":
+        out = classic.median_filter(out, 3); log.append({"paso": "ruido", "origen": "Clásico: mediana 3×3"})
+    elif t_noise == "Gaussiano":
+        out = classic.gaussian_filter(out, 7, 0.8); log.append({"paso": "ruido", "origen": "Clásico: gaussiano 7×7, σ=0.8"})
+    if t_detail > 0:
+        out, lg = run_steps(out, ("detalle",), 2, 0.6, t_detail); log += lg
+    if t_light == "Automática (gamma)":
+        out, g = enhance.auto_gamma(out); log.append({"paso": "luz", "origen": f"Clásico: gamma automática γ={g:.2f}"})
+    elif t_light == "Manual":
+        out = np.power(out, gamma, dtype=np.float32); log.append({"paso": "luz", "origen": f"Clásico: gamma manual γ={gamma}"})
+    if t_contrast == "Niveles automáticos":
+        out = enhance.auto_levels(out)[0]; log.append({"paso": "contraste", "origen": "Clásico: niveles automáticos"})
+    elif t_contrast.startswith("CLAHE"):
+        out = enhance.clahe(out); log.append({"paso": "contraste", "origen": "Clásico: CLAHE"})
+    if t_color > 0:
+        out = enhance.white_balance(out, t_color)[0]; log.append({"paso": "color", "origen": f"Clásico: balance de blancos {t_color}"})
+    if t_sharp > 0:
+        out = enhance.unsharp(out, t_sharp); log.append({"paso": "nitidez", "origen": f"Clásico: máscara de desenfoque {t_sharp}"})
+    if t_up != "No":
+        out, lg = run_steps(out, ("ampliar",), int(t_up[1]), 0.6); log += lg
+    before_after(work, out, cap_b="Resultado")
+    if log:
+        st.dataframe(pd.DataFrame(log).set_index("paso").rename(index=NOMBRES), width="stretch")
+        reference_metrics(reference, work, out)
+        download(out, src_name, "dl_tools")
+
+# ---------------- 3. Análisis ----------------
+with tab_an:
     c1, c2 = st.columns([3, 2])
-    c1.image(rgb(work), caption="Imagen de entrada" + (" (con ruido agregado)" if experiment else ""), width="stretch")
-    est = analysis.estimate_noise_sigma(work)
-    c2.metric("Sigma de ruido ESTIMADO (sin referencia)", f"{est:.1f}",
-              delta=f"real: {level}" if experiment and kind == "gaussian" else None, delta_color="off")
-    c2.caption("Estimación de Immerkær (1996): convolución con un kernel que anula zonas planas. "
-               "Las texturas finas la inflan; no reemplaza al PSNR.")
+    c1.image(rgb(work), caption="Imagen de entrada", width="stretch")
+    c2.metric("Sigma de ruido ESTIMADO (sin referencia)", f"{analysis.estimate_noise_sigma(work):.1f}")
+    c2.caption("Estimación de Immerkær (1996). Las texturas finas la inflan y el desenfoque la baja: no reemplaza al PSNR.")
     c2.dataframe(pd.DataFrame(analysis.channel_stats(work)).T.round(1), width="stretch")
     h = analysis.histograms(work)
     c2.line_chart(pd.DataFrame({"R": h["R"], "G": h["G"], "B": h["B"]}), color=["#e45756", "#54a24b", "#4c78a8"], height=220)
-    with st.expander("Magnitud del gradiente (Sobel, Sesión 05)"):
+    with st.expander("Magnitud del gradiente (Sobel)"):
         g = analysis.gradient_magnitude(work)
-        st.image(np.clip(g / (np.percentile(g, 99) + 1e-9), 0, 1), caption="El ruido también produce gradientes: "
-                 "por eso Canny suaviza antes de derivar.", width="stretch")
+        st.image(np.clip(g / (np.percentile(g, 99) + 1e-9), 0, 1), width="stretch")
 
-# ---------------- 2. Filtros clásicos ----------------
-defaults = classic_defaults()
-key = f"{kind}_{level}" if experiment else "gaussian_25"
-d_med, d_gau = defaults.get(f"{key}_median", {"ksize": 3}), defaults.get(f"{key}_gaussian", {"ksize": 7, "sigma": 0.8})
-with tab_c:
-    c1, c2 = st.columns(2)
-    k_med = c1.select_slider("Mediana: tamaño del kernel", [3, 5, 7, 9], d_med["ksize"])
-    k_gau = c2.select_slider("Gaussiano: tamaño del kernel", [3, 5, 7, 9, 11, 13, 15], d_gau["ksize"])
-    s_gau = c2.slider("Gaussiano: sigma", 0.3, 3.0, float(d_gau["sigma"]), 0.1)
-    own = c2.checkbox("Usar nuestra conv2d en NumPy (Sesión 01)")
-    med, t_med = run_classic(work, "median", (("ksize", k_med),))
-    gau, t_gau = run_classic(work, "gaussian", (("ksize", k_gau), ("sigma", s_gau)), own)
-    c1.image(rgb(med), caption=f"Mediana {k_med}×{k_med} — {t_med * 1000:.0f} ms", width="stretch")
-    c2.image(rgb(gau), caption=f"Gaussiano {k_gau}×{k_gau}, σ={s_gau} — {t_gau * 1000:.0f} ms "
-             f"({'NumPy propio' if own else 'OpenCV'})", width="stretch")
-    st.caption("Si hay un resultado de ajuste en validación (results/classic_params.json) se usan esos parámetros por defecto.")
-    with st.expander("Kernel gaussiano que se está aplicando (filtro FIJO, diseñado a mano)"):
-        st.dataframe(pd.DataFrame(classic.gaussian_kernel(k_gau, s_gau)).round(4))
-
-# ---------------- 3. CNN ----------------
-cnn = None
-with tab_n:
-    if not MODEL_PATH.exists():
-        st.warning("Aún no hay modelo entrenado. Ejecuta: python scripts/train.py")
-    else:
-        mtime = MODEL_PATH.stat().st_mtime
-        cnn, t_cnn = run_cnn(work, mtime)
-        net, meta = load_model(str(MODEL_PATH), mtime)
-        from imageenhance.model import count_params
-        c1, c2 = st.columns(2)
-        c1.image(rgb(cnn), caption=f"CNN — {t_cnn:.2f} s en CPU", width="stretch")
-        resid = work - cnn
-        c2.image(np.clip(0.5 + 3 * resid, 0, 1)[..., ::-1], caption="Lo que la red estimó como ruido "
-                 "(entrada − salida, amplificado ×3)", width="stretch")
-        st.caption(f"Parámetros: {count_params(net):,} | época guardada: {meta.get('epoch')} | "
-                   f"PSNR de validación (σ={meta.get('config', {}).get('val_sigma')}): {meta.get('val_psnr', 0):.2f} dB")
-        with st.expander("Filtros APRENDIDOS de la primera capa (32 kernels 3×3, canal G)"):
-            w = net.noise_net[0].weight.detach().numpy()[:, 1]
-            w = (w - w.min()) / (w.max() - w.min() + 1e-9)
-            tiles = [cv2.resize(k, (48, 48), interpolation=cv2.INTER_NEAREST) for k in w]
-            grid = np.vstack([np.hstack(tiles[i:i + 8]) for i in range(0, len(tiles), 8)])
-            st.image(grid, caption="Nadie los diseñó: salen del descenso de gradiente.", width=400, clamp=True)
-
-# ---------------- 4. Comparación ----------------
-results = {"Entrada": work, "Mediana": med, "Gaussiano": gau}
-if cnn is not None:
-    results["CNN"] = cnn
-with tab_cmp:
-    cols = st.columns(len(results))
-    for col, (name, im) in zip(cols, results.items()):
+# ---------------- 4. Comparación técnica (ruido) ----------------
+with tab_tec:
+    st.caption("Filtros clásicos contra nuestra CNN, con los parámetros elegidos en validación (results/classic_params.json).")
+    p = ROOT / "results" / "classic_params.json"
+    best = json.loads(p.read_text("utf-8"))["best"] if p.exists() else {}
+    key = f"{kind}_{level}" if experiment else "gaussian_25"
+    med = classic.median_filter(work, **best.get(f"{key}_median", {"ksize": 3}))
+    gau = classic.gaussian_filter(work, **best.get(f"{key}_gaussian", {"ksize": 7, "sigma": 0.8}))
+    results = {"Entrada": work, "Mediana": med, "Gaussiano": gau}
+    if models["denoiser"] is not None:
+        results["Nuestra CNN"] = run_steps(work, ("ruido",), 2, 0.6)[0]
+    for col, (name, im) in zip(st.columns(len(results)), results.items()):
         col.image(rgb(im), caption=name, width="stretch")
     if reference is not None:
-        rows = {n: metrics.evaluate(reference, im) for n, im in results.items()}
-        st.subheader("Métricas con referencia limpia")
-        st.dataframe(pd.DataFrame(rows).T.rename(columns={"psnr": "PSNR (dB) ↑", "ssim": "SSIM ↑"}).round(4),
-                     width="stretch")
-        st.caption("Válidas porque el ruido lo agregamos nosotros y conocemos la imagen original.")
+        st.dataframe(pd.DataFrame({n: metrics.evaluate(reference, im) for n, im in results.items()}).T
+                     .rename(columns={"psnr": "PSNR (dB) ↑", "ssim": "SSIM ↑"}).round(3), width="stretch")
     else:
-        st.subheader("Sin referencia limpia")
-        st.info("En una foto real no existe la imagen limpia, así que PSNR y SSIM NO se pueden calcular. "
-                "Solo se muestra el sigma de ruido estimado que queda en cada resultado (estimación, no métrica).")
         st.dataframe(pd.DataFrame({n: {"sigma estimado": analysis.estimate_noise_sigma(im)} for n, im in results.items()}).T.round(2))
-
-# ---------------- 5. Ajustes tradicionales y descarga ----------------
-with tab_adj:
-    base_name = st.selectbox("Resultado base", list(results)[::-1])
-    c1, c2, c3 = st.columns(3)
-    alpha = c1.slider("Contraste (α)", 0.5, 2.0, 1.0, 0.05)
-    beta = c2.slider("Brillo (β, escala 0-255)", -100, 100, 0, 5)
-    amount = c3.slider("Nitidez (realce laplaciano)", 0.0, 2.0, 0.0, 0.1)
-    final = classic.adjust_brightness_contrast(results[base_name], alpha, beta)
-    if amount > 0:
-        final = classic.sharpen(final, amount)
-    st.image(rgb(final), caption=f"{base_name} + A' = {alpha}·A + {beta}" + (f" + realce {amount}" if amount else ""),
-             width="stretch")
-    st.caption("Estos ajustes son procesamiento TRADICIONAL (transformación afín y kernel de realce, Sesión 01), "
-               "no los hace la CNN. El realce amplifica el ruido: aplícalo después de eliminarlo.")
-    ok, buf = cv2.imencode(".png", to_uint8(final))
-    st.download_button("Descargar PNG", buf.tobytes(), file_name=f"{Path(src_name).stem}_{base_name.lower()}.png",
-                       mime="image/png")
+        st.caption("Ojo: un sigma estimado menor NO significa mejor calidad; el desenfoque también lo baja. Compara a la vista.")
+    if "Nuestra CNN" in results:
+        c1, c2 = st.columns(2)
+        c1.image(np.clip(0.5 + 3 * (work - results["Nuestra CNN"]), 0, 1)[..., ::-1],
+                 caption="Lo que la CNN estimó como ruido (entrada − salida, ×3)", width="stretch")
+        w = models["denoiser"].noise_net[0].weight.detach().numpy()[:, 1]
+        w = (w - w.min()) / (w.max() - w.min() + 1e-9)
+        tiles = [cv2.resize(k, (48, 48), interpolation=cv2.INTER_NEAREST) for k in w]
+        c2.image(np.vstack([np.hstack(tiles[i:i + 8]) for i in range(0, len(tiles), 8)]), clamp=True, width=380,
+                 caption=f"32 filtros 3×3 aprendidos por la 1.ª capa (canal G) — época {models['meta'].get('epoch')}")

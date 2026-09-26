@@ -9,6 +9,7 @@ import time
 import numpy as np
 
 from . import enhance, external
+from .io_utils import resize_max
 from .model import denoise
 
 ORIGEN = {"ruido": "Nuestra CNN (entrenada por nosotros)",
@@ -27,14 +28,17 @@ def plan(problemas: dict) -> list[str]:
     return [p for p in ORDEN if quiere.get(p)]
 
 
-def apply_step(step: str, img: np.ndarray, models: dict, factor: int = 2, amount: float = 0.6) -> tuple[np.ndarray, str]:
+def apply_step(step: str, img: np.ndarray, models: dict, factor: int = 2, amount: float = 0.6,
+               strength: float = 1.0) -> tuple[np.ndarray, str]:
     esrgan = models.get("esrgan")
     if step == "ruido":
         return denoise(models["denoiser"], img), "ruido estimado y restado"
     if step == "detalle":
         if esrgan is None:
             return enhance.unsharp(img, amount), "Real-ESRGAN no disponible: se usó máscara de desenfoque"
-        return external.restore(esrgan, img), "nitidez y compresión restauradas"
+        # Mezcla lineal con la entrada: strength=1 es Real-ESRGAN puro; menos suaviza su aspecto "pintado".
+        out = strength * external.restore(esrgan, img) + (1 - strength) * img
+        return out.astype(np.float32), f"nitidez y compresión restauradas (intensidad {strength:.0%})"
     if step == "luz":
         out, g = enhance.auto_gamma(img)
         return out, f"γ = {g:.2f} ({'aclara' if g < 1 else 'oscurece'})"
@@ -49,7 +53,10 @@ def apply_step(step: str, img: np.ndarray, models: dict, factor: int = 2, amount
     if step == "ampliar":
         if esrgan is None:
             raise RuntimeError("Para ampliar se necesita Real-ESRGAN: python scripts/download_models.py")
-        return external.upscale(esrgan, img, factor), f"×{factor}"
+        max_in = {2: 1024, 4: 512}[factor]  # límite para que el portátil no tarde minutos
+        small = resize_max(img, max_in)
+        note = f" (entrada reducida a {small.shape[1]}×{small.shape[0]} px)" if small.shape != img.shape else ""
+        return external.upscale(esrgan, small, factor), f"×{factor}{note}"
     raise ValueError(f"Paso desconocido: {step}")
 
 
