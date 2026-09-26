@@ -2,7 +2,12 @@
 
 Software de mejoramiento de imágenes mediante procesamiento digital de imágenes y redes neuronales convolucionales.
 Proyecto final de **Inteligencia Artificial II** — Institución Universitaria de Colombia.
-Autor: Dylan Esteban Ricaurte Cuervo.
+
+Autores:
+
+- Dylan Esteban Ricaurte Cuervo
+- Brayan Sneyder Garcia Camacho
+- Nicolas David Fontecha
 
 > Estado: en desarrollo.
 
