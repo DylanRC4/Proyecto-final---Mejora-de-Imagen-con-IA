@@ -1,0 +1,35 @@
+{
+ "config": {
+  "seed": 2026,
+  "features": 32,
+  "depth": 7,
+  "patch": 64,
+  "patches_per_image": 32,
+  "batch": 32,
+  "epochs": 40,
+  "lr": 0.001,
+  "lr_min": 1e-05,
+  "sigma_min": 5,
+  "sigma_max": 50,
+  "val_sigma": 25,
+  "val_crop": 160
+ },
+ "env": {
+  "python": "3.14.6",
+  "torch": "2.14.0+cpu",
+  "threads": 6,
+  "device": "cpu",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "processor": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "dataset_commit": "a04b7c6c3a9f0ace74bf205c72a43d32e1c72722",
+  "params": 48003,
+  "train_images": 200,
+  "val_images": 100,
+  "val_noisy_psnr": 20.4942,
+  "val_noisy_ssim": 0.4513,
+  "finished_epochs": 40,
+  "best_val_psnr": 28.8619,
+  "updated": "2026-09-25T20:32:30",
+  "session_minutes": 37.4
+ }
+}
