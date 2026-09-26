@@ -33,3 +33,6 @@ outputs/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Modelos externos preentrenados (se descargan con scripts/download_models.py)
+models/external/
