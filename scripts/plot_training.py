@@ -28,8 +28,10 @@ def main() -> None:
     a1.set(title="Pérdida de entrenamiento (MSE)", xlabel="Época", ylabel="MSE")
     a1.grid(alpha=0.3)
     a2.plot(ep, [float(r["val_psnr"]) for r in rows], "o-", ms=3, label="CNN")
-    a2.axhline(env["val_noisy_psnr"], ls="--", c="gray", label="Sin filtrar")
-    a2.set(title="PSNR de validación (σ=25)", xlabel="Época", ylabel="dB")
+    a2.axhline(env["val_noisy_psnr"], ls="--", c="gray", label="Sin restaurar")
+    task = json.loads((d / "config.json").read_text("utf-8"))["config"].get("task", "noise")
+    a2.set(title="PSNR de validación (" + ("ruido σ=25" if task == "noise" else "degradación fija de detalle") + ")",
+           xlabel="Época", ylabel="dB")
     a2.legend()
     a2.grid(alpha=0.3)
     fig.tight_layout()

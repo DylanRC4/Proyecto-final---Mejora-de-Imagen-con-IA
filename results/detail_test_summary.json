@@ -1,0 +1,90 @@
+{
+ "model": "models/detail_cnn.pt",
+ "model_epoch": 15,
+ "test_images": 200,
+ "nitidez_clasica_elegida_en_validacion": {
+  "fija": 1.5,
+  "desenfoque": 1.5,
+  "jpeg": 0.3,
+  "baja_res": 1.0
+ },
+ "seconds": 616.9,
+ "results": {
+  "fija": {
+   "sin_restaurar": {
+    "psnr": 25.8172165,
+    "ssim": 0.7293169999999999
+   },
+   "nitidez_clasica": {
+    "psnr": 26.163731499999997,
+    "ssim": 0.7346334999999999
+   },
+   "cnn_detalle": {
+    "psnr": 26.7855385,
+    "ssim": 0.7684755000000001
+   },
+   "real_esrgan": {
+    "psnr": 26.237000500000004,
+    "ssim": 0.7491649999999999
+   },
+   "cnn_mejora_la_foto_en": "199/200"
+  },
+  "desenfoque": {
+   "sin_restaurar": {
+    "psnr": 25.794337999999996,
+    "ssim": 0.7423500000000002
+   },
+   "nitidez_clasica": {
+    "psnr": 26.991607,
+    "ssim": 0.7966165000000001
+   },
+   "cnn_detalle": {
+    "psnr": 28.2159435,
+    "ssim": 0.8421835000000002
+   },
+   "real_esrgan": {
+    "psnr": 26.331747,
+    "ssim": 0.7495320000000001
+   },
+   "cnn_mejora_la_foto_en": "199/200"
+  },
+  "jpeg": {
+   "sin_restaurar": {
+    "psnr": 28.212835,
+    "ssim": 0.8274320000000001
+   },
+   "nitidez_clasica": {
+    "psnr": 27.483109000000002,
+    "ssim": 0.8138299999999999
+   },
+   "cnn_detalle": {
+    "psnr": 27.930370000000003,
+    "ssim": 0.8255895000000001
+   },
+   "real_esrgan": {
+    "psnr": 26.4457665,
+    "ssim": 0.7888725
+   },
+   "cnn_mejora_la_foto_en": "34/200"
+  },
+  "baja_res": {
+   "sin_restaurar": {
+    "psnr": 28.415508,
+    "ssim": 0.853353
+   },
+   "nitidez_clasica": {
+    "psnr": 29.02672,
+    "ssim": 0.88107
+   },
+   "cnn_detalle": {
+    "psnr": 28.8005685,
+    "ssim": 0.8671129999999999
+   },
+   "real_esrgan": {
+    "psnr": 27.249840999999996,
+    "ssim": 0.8101554999999999
+   },
+   "cnn_mejora_la_foto_en": "161/200"
+  }
+ }
+}
