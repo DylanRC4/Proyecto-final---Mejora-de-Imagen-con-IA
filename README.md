@@ -11,6 +11,7 @@ Autores:
 - Dylan Esteban Ricaurte Cuervo
 - Brayan Sneyder Garcia Camacho
 - Nicolas David Fontecha Poveda
+- Esteban Monroy
 
 ## Características principales
 
