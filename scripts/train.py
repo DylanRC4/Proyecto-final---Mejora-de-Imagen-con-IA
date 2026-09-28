@@ -1,14 +1,18 @@
-"""Entrenamiento supervisado de la CNN con pares (limpia, ruidosa) generados al vuelo.
+"""Entrenamiento supervisado de las CNN con pares (limpia, degradada) generados al vuelo.
 
+Dos tareas, según "task" en la configuración:
+- "noise" (configs/train.json): ruido gaussiano con sigma aleatorio en [sigma_min, sigma_max].
+- "detail" (configs/train_detail.json): desenfoque, baja resolución, poco ruido y JPEG aleatorios
+  (noise.random_detail). Se entrena con MSE: la red no inventa texturas, solo recupera lo deducible.
 En cada época se recortan `patches_per_image` parches aleatorios de CADA foto de entrenamiento
-(con giros/espejos) y se les suma ruido gaussiano con sigma aleatorio en [sigma_min, sigma_max].
-Todo sale de un generador con semilla (seed, época): el entrenamiento es reproducible.
-Validación: recorte central de cada foto de validación con ruido fijo (sigma = val_sigma).
+(con giros/espejos). Todo sale de un generador con semilla (seed, época): es reproducible.
+Validación: recorte central de cada foto de validación con degradación fija.
 Se guarda el modelo de la época con mejor PSNR de validación. Las fotos de prueba no se tocan.
 
 Uso:
   python scripts/train.py --bench 30   # mide 30 lotes y estima el tiempo total, sin guardar nada
   python scripts/train.py              # entrenamiento completo con configs/train.json
+  python scripts/train.py --config configs/train_detail.json --name detail_cnn
   python scripts/train.py --resume     # continúa desde checkpoints/<name>_last.pt
 Salidas: models/<name>.pt, results/<name>/train_log.csv y config.json, checkpoints/<name>_last.pt
 """
@@ -27,7 +31,7 @@ import torch
 from torch import nn
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from imageenhance import data, metrics, model as M  # noqa: E402
+from imageenhance import data, metrics, model as M, noise  # noqa: E402
 
 
 def to_nchw(a: np.ndarray) -> torch.Tensor:
@@ -38,20 +42,27 @@ def make_epoch(train_imgs, cfg, epoch):
     rng = np.random.default_rng([cfg["seed"], epoch])
     clean = np.concatenate([data.random_patches(im, cfg["patches_per_image"], cfg["patch"], rng) for _, im in train_imgs])
     clean = clean[rng.permutation(len(clean))].astype(np.float32) / 255.0
-    sigma = rng.uniform(cfg["sigma_min"], cfg["sigma_max"], (len(clean), 1, 1, 1)).astype(np.float32) / 255.0
-    noisy = np.clip(clean + rng.standard_normal(clean.shape, dtype=np.float32) * sigma, 0.0, 1.0)
+    if cfg.get("task", "noise") == "detail":
+        noisy = np.stack([noise.random_detail(p, rng) for p in clean])
+    else:
+        sigma = rng.uniform(cfg["sigma_min"], cfg["sigma_max"], (len(clean), 1, 1, 1)).astype(np.float32) / 255.0
+        noisy = np.clip(clean + rng.standard_normal(clean.shape, dtype=np.float32) * sigma, 0.0, 1.0)
     return to_nchw(clean), to_nchw(noisy)
 
 
 def build_val(cfg, limit=None):
-    c, s = cfg["val_crop"], cfg["val_sigma"]
+    c = cfg["val_crop"]
     clean, noisy = [], []
     for name, im in data.load_split("val", limit):
         y, x = (im.shape[0] - c) // 2, (im.shape[1] - c) // 2
         crop = im[y:y + c, x:x + c]
-        rng = np.random.default_rng(data.noise_seed(name, "gaussian", s))
         clean.append(crop)
-        noisy.append(np.clip(crop + rng.normal(0, s / 255.0, crop.shape).astype(np.float32), 0, 1))
+        if cfg.get("task", "noise") == "detail":
+            noisy.append(noise.fixed_detail(crop))
+        else:
+            s = cfg["val_sigma"]
+            rng = np.random.default_rng(data.noise_seed(name, "gaussian", s))
+            noisy.append(np.clip(crop + rng.normal(0, s / 255.0, crop.shape).astype(np.float32), 0, 1))
     return np.stack(clean), np.stack(noisy)
 
 
@@ -127,7 +138,7 @@ def main() -> None:
         print(f"Reanudando desde la época {start}")
 
     noisy_psnr, noisy_ssim = np.mean([metrics.psnr(c, n) for c, n in zip(*val)]), np.mean([metrics.ssim(c, n) for c, n in zip(*val)])
-    print(f"Validación sin filtrar (sigma={cfg['val_sigma']}): PSNR {noisy_psnr:.2f} dB | SSIM {noisy_ssim:.4f}")
+    print(f"Validación sin restaurar ({cfg.get('task', 'noise')}): PSNR {noisy_psnr:.2f} dB | SSIM {noisy_ssim:.4f}")
     env = {"python": platform.python_version(), "torch": torch.__version__, "threads": torch.get_num_threads(),
            "device": device, "platform": platform.platform(), "processor": platform.processor(),
            "dataset_commit": json.loads(data.MANIFEST.read_text("utf-8"))["commit"], "params": M.count_params(net),

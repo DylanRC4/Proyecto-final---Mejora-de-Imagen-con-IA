@@ -48,3 +48,14 @@ def test_sal_pimienta_proporcion_y_no_modifica_original(img):
     frac = np.any(sp != img, axis=-1).mean()
     assert np.array_equal(img, orig)
     assert 0.03 < frac < 0.06
+
+
+def test_degradaciones_de_detalle(img):
+    rng = np.random.default_rng(0)
+    assert noise.add_downscale(img, 2.0).shape == img.shape
+    assert noise.fixed_detail(img).shape == img.shape
+    a, b = noise.random_detail(img, np.random.default_rng(5)), noise.random_detail(img, np.random.default_rng(5))
+    assert np.array_equal(a, b)  # misma semilla, misma degradación
+    # reducir y ampliar pierde detalle fino: la imagen cambia, pero su brillo medio casi no
+    d = noise.add_downscale(img, 3.0)
+    assert np.abs(d - img).mean() > 1e-3 and abs(d.mean() - img.mean()) < 0.01

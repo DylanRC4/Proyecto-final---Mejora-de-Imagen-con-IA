@@ -46,6 +46,35 @@ def add_jpeg(img: np.ndarray, quality: int) -> np.ndarray:
     return cv2.imdecode(buf, cv2.IMREAD_UNCHANGED).astype(np.float32) / 255.0
 
 
+def add_downscale(img: np.ndarray, factor: float) -> np.ndarray:
+    """Baja resolución: reduce la foto `factor` veces y la devuelve a su tamaño con interpolación bicúbica.
+    El tamaño no cambia, pero el detalle fino se perdió: es lo que la red debe recuperar."""
+    h, w = img.shape[:2]
+    small = cv2.resize(img, (max(1, round(w / factor)), max(1, round(h / factor))), interpolation=cv2.INTER_AREA)
+    return np.clip(cv2.resize(small, (w, h), interpolation=cv2.INTER_CUBIC), 0.0, 1.0).astype(np.float32)
+
+
+def random_detail(img: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """Degradación aleatoria para entrenar la CNN de DETALLE, en el orden de una cámara real:
+    lente (desenfoque) → sensor (baja resolución, algo de ruido) → compresión (JPEG).
+    A veces no se aplica nada (≈4 %): así la red también aprende a NO cambiar una foto que ya está bien."""
+    x = img
+    if rng.random() < 0.7:
+        x = add_blur(x, rng.uniform(0.5, 2.5))
+    if rng.random() < 0.5:
+        x = add_downscale(x, float(rng.choice([1.5, 2.0, 3.0])))
+    if rng.random() < 0.3:
+        x = add_gaussian(x, rng.uniform(1, 5), seed=int(rng.integers(1 << 31)))
+    if rng.random() < 0.6:
+        x = add_jpeg(x, int(rng.integers(10, 61)))
+    return x
+
+
+def fixed_detail(img: np.ndarray) -> np.ndarray:
+    """Degradación FIJA de validación y prueba: desenfoque 1.0 → reducción ×2 → JPEG calidad 35."""
+    return add_jpeg(add_downscale(add_blur(img, 1.0), 2.0), 35)
+
+
 def degrade(img: np.ndarray, kind: str = "gaussian", level: float = 25, seed: int | None = None) -> np.ndarray:
     """Punto de entrada único: gaussian (level=sigma), salt_pepper (fracción), blur (sigma), jpeg (calidad)."""
     if kind == "gaussian":
@@ -56,4 +85,6 @@ def degrade(img: np.ndarray, kind: str = "gaussian", level: float = 25, seed: in
         return add_blur(img, level)
     if kind == "jpeg":
         return add_jpeg(img, int(level))
+    if kind == "downscale":
+        return add_downscale(img, level)
     raise ValueError(f"Tipo de degradación desconocido: {kind}")
