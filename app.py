@@ -18,7 +18,7 @@ from imageenhance.io_utils import bgr_to_rgb, decode_bytes, resize_max, to_float
 ROOT = Path(__file__).resolve().parent
 EXAMPLE_DIRS = {"demo": ROOT / "data" / "demo", "bsds": ROOT / "data" / "raw" / "bsds500" / "test"}
 NOMBRES = {"ruido": "Ruido", "detalle": "Detalle (desenfoque / compresión)", "luz": "Iluminación",
-           "contraste": "Contraste", "color": "Color", "nitidez": "Nitidez extra", "ampliar": "Ampliar ×2",
+           "contraste": "Contraste", "retoque": "Retoque aprendido (FiveK)", "color": "Color", "nitidez": "Nitidez extra", "ampliar": "Ampliar ×2",
            "detalle_externo": "Detalle con Real-ESRGAN (externo)", "ampliar_externo": "Ampliar con Real-ESRGAN (externo)"}
 
 st.set_page_config(page_title="ImageEnhance AI", layout="wide")
@@ -27,13 +27,16 @@ st.set_page_config(page_title="ImageEnhance AI", layout="wide")
 @st.cache_resource(show_spinner="Cargando modelos…")
 def load_models():
     from imageenhance import external, model
-    m = {"denoiser": None, "detail": None, "diagnoser": None, "esrgan": None, "meta": {}}
+    m = {"denoiser": None, "detail": None, "diagnoser": None, "esrgan": None, "retouch": None, "meta": {}}
     if (ROOT / "models" / pipeline.NOISE_MODEL).exists():
         m["denoiser"], m["meta"] = model.load(ROOT / "models" / pipeline.NOISE_MODEL)
     if (ROOT / "models" / pipeline.DETAIL_MODEL).exists():
         m["detail"] = model.load(ROOT / "models" / pipeline.DETAIL_MODEL)[0]
     if (ROOT / "models" / "diagnosis_mlp.pt").exists():
         m["diagnoser"] = diagnosis.Diagnoser(ROOT / "models" / "diagnosis_mlp.pt")
+    if (ROOT / "models" / "retouch_fivek.pt").exists():
+        from imageenhance import retouch
+        m["retouch"] = retouch.load(ROOT / "models" / "retouch_fivek.pt")
     if external.ESRGAN_PATH.exists():
         m["esrgan"] = external.load_esrgan()
     return m
@@ -123,6 +126,7 @@ if experiment:
 
 st.sidebar.markdown("**Modelos**")
 for label, key, origin in [("CNN de ruido", "denoiser", "nuestra"), ("CNN de detalle", "detail", "nuestra"),
+                           ("CNN de retoque (FiveK)", "retouch", "nuestra"),
                            ("MLP de diagnóstico", "diagnoser", "nuestra"), ("Real-ESRGAN", "esrgan", "externo")]:
     st.sidebar.caption(f"{'✅' if models[key] is not None else '❌'} {label} ({origin})")
 if models["esrgan"] is None:
@@ -158,7 +162,12 @@ with tab_auto:
                                    "detectado": ["sí" if probs[k] else "no" for k in
                                                  ("oscura", "sobreexpuesta", "poco_contraste", "dominante_color")]},
                                   index=["oscura", "sobreexpuesta", "poco contraste", "dominante de color"]), width="stretch")
-        plan = pipeline.plan(probs)
+        # Retoque aprendido: estético (se compara contra un fotógrafo, no contra la foto limpia), así que en el modo
+        # experimento arranca apagado para que el PSNR mida solo la restauración.
+        retoque = models["retouch"] is not None and st.checkbox(
+            "Retoque aprendido: luz, contraste y color como los ajustaría un fotógrafo (CNN entrenada con FiveK)",
+            value=not experiment, key="retoque")
+        plan = pipeline.plan(probs, retoque=retoque)
         if probs["dominante_color"]:  # el color no se corrige solo (ver pipeline.plan): decide quien conoce la escena
             st.info(f"Posible dominante de color (bordes {f['dominante_bordes']:.2f} > {diagnosis.COLOR_UMBRAL}). No se corrige "
                     "sola: puede ser la luz de la escena (atardecer, faroles) o un defecto (bombillo amarillo, fluorescente).")
@@ -194,7 +203,8 @@ with tab_tools:
         if t_detail.startswith("Real") else 0.7
     t_light = c2.selectbox("Iluminación", ["No", "Automática (gamma)", "Manual"], key="t_luz")
     gamma = c2.slider("γ (menor que 1 aclara)", 0.3, 3.0, 1.0, 0.05, key="t_gamma") if t_light == "Manual" else None
-    t_contrast = c2.selectbox("Contraste", ["No", "Niveles automáticos", "CLAHE (por zonas)"], key="t_contraste")
+    t_contrast = c2.selectbox("Contraste", ["No", "Niveles automáticos", "CLAHE (por zonas)", "Retoque aprendido (FiveK)"],
+                              key="t_contraste")
     t_color = c3.slider("Balance de blancos (intensidad)", 0.0, 1.0, 0.0, 0.1, key="t_color")
     t_sharp = c3.slider("Nitidez (máscara de desenfoque)", 0.0, 2.0, 0.0, 0.1, key="t_nitidez")
     t_up = c3.selectbox("Ampliar resolución", ["No", "×2 — nuestra CNN", "×2 — Real-ESRGAN (externo)", "×4 — Real-ESRGAN (externo)"],
@@ -211,6 +221,8 @@ with tab_tools:
         log += lg
     if t_contrast == "Niveles automáticos":
         out = enhance.auto_levels(out)[0]; log.append({"paso": "contraste", "origen": "Clásico: niveles automáticos"})
+    elif t_contrast.startswith("Retoque") and models["retouch"] is not None:
+        out, lg = run_steps(out, ("retoque",)); log += lg
     elif t_contrast.startswith("CLAHE"):
         out = enhance.clahe(out); log.append({"paso": "contraste", "origen": "Clásico: CLAHE"})
     if t_light == "Automática (gamma)":

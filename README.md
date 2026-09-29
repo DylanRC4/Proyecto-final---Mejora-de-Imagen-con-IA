@@ -13,11 +13,13 @@ Autores: Dylan Esteban Ricaurte Cuervo · Brayan Sneyder Garcia Camacho · Nicol
 1. **Diagnóstico:** se miden 11 características de la foto; un MLP entrenado por nosotros decide si hay ruido,
    desenfoque o compresión JPEG, y reglas sobre el histograma (umbrales elegidos en validación) deciden luz y contraste.
 2. **Plan:** los pasos se ordenan siempre igual: ruido → detalle → contraste → luz.
-3. **Restauración:** CNN de ruido, CNN de detalle, niveles y gamma (que vuelve a medir la foto antes de actuar).
-4. **Color:** si se detecta una posible dominante, la app **avisa** y ofrece neutralizarla con una casilla. No se corrige
-   sola porque sin la foto original no se distingue la luz de la escena (atardecer, faroles) de un defecto: el detector
-   se equivocaba en 33 de 100 fotos modernas limpias (DIV2K).
-5. **Interfaz:** antes/después, **lupa ×3** de la zona que más cambió, tabla de pasos con su origen y, en el modo
+3. **Restauración:** CNN de ruido y CNN de detalle.
+4. **Retoque aprendido (FiveK):** una tercera CNN ajusta luz, contraste y color como lo haría un fotógrafo (casilla activa
+   por defecto en fotos reales). Sin ella, niveles y gamma (reglas que vuelven a medir la foto antes de actuar).
+5. **Color:** un detector con umbral no distingue la luz de la escena (atardecer, faroles) de un defecto (se equivocaba en
+   33 de 100 fotos modernas limpias de DIV2K); el retoque aprendido sí lo resuelve porque aprendió de un fotógrafo.
+   Si se detecta una posible dominante, la app avisa y ofrece además el balance de blancos clásico.
+6. **Interfaz:** antes/después, **lupa ×3** de la zona que más cambió, tabla de pasos con su origen y, en el modo
    experimento, PSNR y SSIM contra la foto limpia.
 
 ## Modelos
@@ -26,6 +28,7 @@ Autores: Dylan Esteban Ricaurte Cuervo · Brayan Sneyder Garcia Camacho · Nicol
 |---|---|---|---|
 | `models/denoise_cnn_v2.pt` | Quitar ruido (gaussiano y de celular) | **Entrenado por nosotros** (DIV2K, 10 capas) | 75.747 |
 | `models/detail_cnn_v3.pt` | Desenfoque, JPEG y baja resolución | **Entrenado por nosotros** (DIV2K, 16 capas, He init) | 293.619 |
+| `models/retouch_fivek.pt` | Retoque: luz, contraste y color | **Entrenado por nosotros** (MIT-Adobe FiveK, experto C; predice 13 ajustes globales) | 65.517 |
 | `models/diagnosis_mlp.pt` | Diagnosticar ruido / desenfoque / JPEG | **Entrenado por nosotros** (11 → 32 → 16 → 3) | 963 |
 | `models/external/realesr-general-x4v3.pth` | Superresolución (solo manual) | **Externo:** Real-ESRGAN (Wang et al., 2021), BSD-3, generativo | 1.213.296 |
 
@@ -52,6 +55,9 @@ anteriores (`denoise_cnn.pt`, `detail_cnn.pt`, `detail_cnn_v2.pt`) se conservan 
 | JPEG calidad 20 | 28,21 | 27,48 | **28,34** | 28,13 | 26,45 |
 | Muy borrosa (σ 3 → ×2 → JPEG 60) | 22,94 | 23,09 | 23,48 | **24,22** | 23,90 |
 | Celular (cámara → JPEG 85) | 28,80 | 27,61 | 28,64 | **29,45** | 25,95 |
+
+**Retoque aprendido** (498 fotos de prueba de FiveK completas, contra el retoque del experto C): sin tocar 17,91 dB →
+nuestras reglas 19,90 → **retoque aprendido 24,47 dB / 0,870** (mejora 449 de 498 fotos).
 
 **Diagnóstico** (800 muestras de prueba): los 3 problemas correctos a la vez en **81,6 %** (MLP) contra 64,0 % (mejor
 umbral sobre una sola característica).
@@ -83,13 +89,14 @@ Si se cambia el código, hay que cerrar Streamlit y volver a abrirlo (los módul
 ## Reproducir los experimentos
 
 ```powershell
-python -m pytest -q                                           # 62 pruebas
+python -m pytest -q                                           # 66 pruebas
 python scripts\prepare_div2k.py                               # DIV2K reducido ×2 (700/100/100)
 python scripts\train.py --config configs\train_noise_v2.json --name denoise_cnn_v2   # CNN de ruido v2
 python scripts\train.py --config configs\train_detail_v3.json --name detail_cnn_v3  # CNN de detalle v3
 python scripts\train_diagnosis.py                             # MLP de diagnóstico
 python scripts\evaluate.py; python scripts\evaluate_detail.py # evaluación de cada red
 python scripts\evaluate_system.py [--split val]               # sistema completo
+python scripts\prepare_fivek.py; python scripts\train_retouch.py --epochs 40   # retoque (FiveK 480p en data/raw/fivek)
 ```
 
 Todo usa semillas fijas y splits por fotografía (ninguna foto aparece en dos subconjuntos).
@@ -97,7 +104,8 @@ Todo usa semillas fijas y splits por fotografía (ninguna foto aparece en dos su
 ## Limitaciones
 
 - Entrenamos con degradaciones sintéticas; no medimos con un dataset de ruido real con referencia (PolyU, SIDD).
-- Luz y contraste son reglas y el color solo se avisa: el sistema corrige defectos, no "embellece".
+- El retoque aprendió el gusto de UNA persona (experto C) sobre fotos de cámara réflex; en fotos de celular ya procesadas
+  puede exagerar, por eso es una casilla que se puede apagar. FiveK es solo para investigación.
 - Con grano grueso (3-6 px), con sal y pimienta y con desenfoque suave sin compresión (v3) el rendimiento baja.
 - Con todas las degradaciones juntas, el plan con métodos clásicos queda levemente mejor (18,21 contra 18,05 dB).
 - No recupera caras de pocos píxeles ni fotos muy movidas: eso solo lo hace una IA generativa, que no usamos.
@@ -105,4 +113,5 @@ Todo usa semillas fijas y splits por fotografía (ninguna foto aparece en dos su
 ## Créditos
 
 - BSDS500: Arbeláez et al., 2011 (uso académico). DIV2K: Agustsson y Timofte, 2017.
+- MIT-Adobe FiveK: Bychkovsky et al., 2011 (solo investigación); versión 480p y split de prueba del paper 3D-LUT (Zeng et al., 2020).
 - Real-ESRGAN: Wang et al., 2021, `github.com/xinntao/Real-ESRGAN` (BSD-3). DnCNN: Zhang et al., 2017.

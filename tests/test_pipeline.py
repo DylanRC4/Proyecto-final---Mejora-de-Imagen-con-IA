@@ -16,6 +16,15 @@ def models():
     return {"denoiser": DenoiseCNN(3, 8, 3), "detail": DenoiseCNN(3, 8, 3), "esrgan": SRVGGNetCompact(feat=8, n_conv=2).eval()}
 
 
+def test_retoque_reemplaza_luz_y_contraste_y_arranca_como_identidad(models):
+    from imageenhance.retouch import RetouchNet
+    oscura = {**SANA, "ruido": True, "oscura": True}
+    assert P.plan(oscura) == ["ruido", "contraste", "luz"] and P.plan(oscura, retoque=True) == ["ruido", "retoque"]
+    img = np.random.default_rng(0).random((40, 50, 3)).astype(np.float32)
+    out, log = P.run(img, ["retoque"], {**models, "retouch": RetouchNet()})
+    assert np.abs(out - img).max() < 1e-5 and "FiveK" in log[0]["origen"]
+
+
 def test_plan_respeta_el_orden():
     assert P.plan(SANA) == []
     todo = dict.fromkeys(SANA, True)

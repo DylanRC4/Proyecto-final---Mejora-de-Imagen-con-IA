@@ -14,7 +14,7 @@ import time
 import cv2
 import numpy as np
 
-from . import diagnosis, enhance, external
+from . import diagnosis, enhance, external, retouch
 from .io_utils import resize_max
 from .model import denoise as cnn  # aplica cualquiera de nuestras CNN residuales, por bloques
 
@@ -22,10 +22,11 @@ ORIGEN = {"ruido": "Nuestra CNN de ruido (entrenada por nosotros)",
           "detalle": "Nuestra CNN de detalle (entrenada por nosotros)",
           "detalle_externo": "Real-ESRGAN (externo, preentrenado, generativo)",
           "luz": "Clásico: corrección gamma", "contraste": "Clásico: niveles automáticos",
+          "retoque": "Nuestra CNN de retoque (aprendió del experto C de FiveK)",
           "color": "Clásico: balance de blancos gray-edge", "nitidez": "Clásico: máscara de desenfoque",
           "ampliar": "Bicúbica ×2 + nuestra CNN de detalle",
           "ampliar_externo": "Real-ESRGAN (externo, preentrenado, generativo)"}
-ORDEN = ["ruido", "detalle", "detalle_externo", "contraste", "luz", "color", "nitidez", "ampliar", "ampliar_externo"]
+ORDEN = ["ruido", "detalle", "detalle_externo", "contraste", "luz", "retoque", "color", "nitidez", "ampliar", "ampliar_externo"]
 PROPIOS = [p for p in ORDEN if not p.endswith("_externo")]
 # CNN de detalle que usa la app: v3 (mezcla realista: ruido de cámara, JPEG, reducción y combinaciones).
 # Elegida en la ronda 4 (aún con color automático) con el sistema completo en VALIDACIÓN (100 fotos) y confirmada:
@@ -39,14 +40,16 @@ DETAIL_MODEL = "detail_cnn_v3.pt"
 NOISE_MODEL = "denoise_cnn_v2.pt"
 
 
-def plan(problemas: dict) -> list[str]:
+def plan(problemas: dict, retoque: bool = False) -> list[str]:
     """Traduce el diagnóstico en pasos, siempre en el orden de ORDEN. El COLOR no entra en el modo automático:
     en DIV2K val (fotos modernas limpias: atardeceres, faroles, girasoles) el detector se equivoca en 33 de 100 y
     ningún umbral sirve (con 0.5: 6 % de falsas alarmas, pero detecta solo el 2 % de las dominantes). Sin la foto
-    original no se distingue la luz de la escena de un defecto: la app solo avisa y el usuario decide (Herramientas)."""
+    original no se distingue la luz de la escena de un defecto: la app solo avisa y el usuario decide (Herramientas).
+    Con retoque=True, luz y contraste los decide la CNN de retoque (FiveK) en vez de las reglas: en las 498 fotos de
+    prueba de FiveK, contra el experto C, 17,91 dB sin tocar → 19,90 con las reglas → 24,47 con el retoque."""
     luz = problemas["oscura"] or problemas["sobreexpuesta"]
     quiere = {"ruido": problemas["ruido"], "detalle": problemas["desenfoque"] or problemas["compresion"],
-              "contraste": problemas["poco_contraste"] or luz, "luz": luz}
+              "contraste": (problemas["poco_contraste"] or luz) and not retoque, "luz": luz and not retoque, "retoque": retoque}
     return [p for p in ORDEN if quiere.get(p)]
 
 
@@ -75,6 +78,8 @@ def apply_step(step: str, img: np.ndarray, models: dict, factor: int = 2, amount
     if step == "luz":
         out, g = enhance.auto_gamma(img)
         return out, f"γ = {g:.2f} ({'aclara' if g < 1 else 'oscurece'})"
+    if step == "retoque":
+        return retouch.retouch(models["retouch"], img)
     if step == "contraste":
         out, a, b = enhance.auto_levels(img)
         return out, f"α = {a:.2f}, β = {b * 255:.0f}"

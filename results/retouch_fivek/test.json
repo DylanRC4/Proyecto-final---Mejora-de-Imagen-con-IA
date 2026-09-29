@@ -1,0 +1,25 @@
+{
+ "fotos": 498,
+ "resultados": {
+  "entrada": {
+   "psnr": 17.908855468969033,
+   "ssim": 0.7721214911380069,
+   "mejora_vs_entrada": "0/498"
+  },
+  "reglas_actuales": {
+   "psnr": 19.90445407882562,
+   "ssim": 0.8063538867814786,
+   "mejora_vs_entrada": "124/498"
+  },
+  "reglas_y_balance": {
+   "psnr": 19.564125825140795,
+   "ssim": 0.8044579927463466,
+   "mejora_vs_entrada": "217/498"
+  },
+  "retoque_aprendido": {
+   "psnr": 24.466037609648794,
+   "ssim": 0.870414063949468,
+   "mejora_vs_entrada": "449/498"
+  }
+ }
+}
