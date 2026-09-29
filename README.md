@@ -1,72 +1,65 @@
 # ImageEnhance AI
 
 Software en Python que **analiza una fotografía, detecta qué problemas tiene y la mejora automáticamente**
-combinando inteligencia artificial entrenada por nosotros, un modelo externo de superresolución y
-procesamiento digital de imágenes clásico.
+con redes neuronales entrenadas por nosotros y procesamiento digital de imágenes clásico. Nada es generativo:
+el sistema no inventa detalles que la foto no tenga.
 
 Proyecto final de **Inteligencia Artificial II** — Institución Universitaria de Colombia.
 
-Autores:
+Autores: Dylan Esteban Ricaurte Cuervo · Brayan Sneyder Garcia Camacho · Nicolas David Fontecha Poveda · Esteban Monroy
 
-- Dylan Esteban Ricaurte Cuervo
-- Brayan Sneyder Garcia Camacho
-- Nicolas David Fontecha Poveda
-- Esteban Monroy
+## Cómo funciona
 
-## Características principales
-
-- **Mejora automática:** un clasificador MLP diagnostica la foto (ruido, desenfoque, compresión JPEG) y reglas
-  sobre el histograma detectan iluminación, contraste y color. Con ese diagnóstico el programa propone los
-  pasos y los aplica en el orden correcto: ruido → detalle → luz → contraste → color.
-- **Reducción de ruido** con una CNN residual entrenada desde cero por nosotros.
-- **Restauración de detalle** (desenfoque leve y artefactos de compresión) con Real-ESRGAN, con intensidad ajustable.
-- **Aumento de resolución ×2 y ×4** con Real-ESRGAN.
-- **Iluminación** (corrección gamma), **contraste** (niveles automáticos y CLAHE), **color** (balance de blancos)
-  y **nitidez** (máscara de desenfoque).
-- **Herramientas individuales** para aplicar cada mejora por separado.
-- **Comparación antes/después** y **descarga** del resultado en PNG.
-- **Métricas honestas:** PSNR y SSIM solo cuando existe la imagen limpia de referencia (modo experimento).
-  En fotos reales se compara a la vista.
-- **Análisis de la imagen:** histogramas por canal, estadísticas, ruido estimado y gradiente de Sobel.
-- **Pensado para un portátil:** todo corre en CPU, las fotos grandes se procesan por bloques y, una vez
-  instalado, no necesita internet.
+1. **Diagnóstico:** se miden 11 características de la foto; un MLP entrenado por nosotros decide si hay ruido,
+   desenfoque o compresión JPEG, y reglas sobre el histograma (umbrales elegidos en validación) deciden luz y contraste.
+2. **Plan:** los pasos se ordenan siempre igual: ruido → detalle → contraste → luz.
+3. **Restauración:** CNN de ruido, CNN de detalle, niveles y gamma (que vuelve a medir la foto antes de actuar).
+4. **Color:** si se detecta una posible dominante, la app **avisa** y ofrece neutralizarla con una casilla. No se corrige
+   sola porque sin la foto original no se distingue la luz de la escena (atardecer, faroles) de un defecto: el detector
+   se equivocaba en 33 de 100 fotos modernas limpias (DIV2K).
+5. **Interfaz:** antes/después, **lupa ×3** de la zona que más cambió, tabla de pasos con su origen y, en el modo
+   experimento, PSNR y SSIM contra la foto limpia.
 
 ## Modelos
 
-| Modelo | Tarea | Origen | Parámetros | Resultado medido |
-|---|---|---|---|---|
-| `models/denoise_cnn.pt` | Quitar ruido | **Entrenado por nosotros** (40 épocas, CPU, ~36 min) | 48.003 | Ver tabla de ruido |
-| `models/diagnosis_mlp.pt` | Diagnosticar ruido / desenfoque / JPEG | **Entrenado por nosotros** | 963 | 83,5 % de fotos con los 3 diagnósticos correctos |
-| `models/external/realesr-general-x4v3.pth` | Detalle y superresolución | **Externo preentrenado:** Real-ESRGAN (Wang et al., 2021), licencia BSD-3 | 1.213.296 | Se evalúa a la vista (ver limitaciones) |
+| Modelo | Tarea | Origen | Parámetros |
+|---|---|---|---|
+| `models/denoise_cnn_v2.pt` | Quitar ruido (gaussiano y de celular) | **Entrenado por nosotros** (DIV2K, 10 capas) | 75.747 |
+| `models/detail_cnn_v3.pt` | Desenfoque, JPEG y baja resolución | **Entrenado por nosotros** (DIV2K, 16 capas, He init) | 293.619 |
+| `models/diagnosis_mlp.pt` | Diagnosticar ruido / desenfoque / JPEG | **Entrenado por nosotros** (11 → 32 → 16 → 3) | 963 |
+| `models/external/realesr-general-x4v3.pth` | Superresolución (solo manual) | **Externo:** Real-ESRGAN (Wang et al., 2021), BSD-3, generativo | 1.213.296 |
 
-La arquitectura de la CNN de ruido se inspira en DnCNN (Zhang et al., 2017). Sus pesos y los de la MLP salen
-de nuestro entrenamiento; no se usan pesos preentrenados de terceros para ellos.
+Las CNN son residuales al estilo DnCNN (Zhang et al., 2017): estiman lo que sobra y lo restan. Las versiones
+anteriores (`denoise_cnn.pt`, `detail_cnn.pt`, `detail_cnn_v2.pt`) se conservan para reproducir las comparaciones.
 
-## Resultados
+## Resultados (200 fotos de prueba de BSDS500, nunca vistas al entrenar; PSNR dB / SSIM)
 
-**Reducción de ruido** en las 200 fotos de prueba de BSDS500, que ningún modelo vio al entrenar
-(PSNR en dB / SSIM, más alto es mejor):
+**Ruido:**
 
-| Ruido | Sin filtrar | Mediana | Gaussiano | Nuestra CNN |
-|---|---|---|---|---|
-| Gaussiano σ = 15 | 24,83 / 0,563 | 26,96 / 0,714 | 28,04 / 0,785 | **30,94 / 0,872** |
-| Gaussiano σ = 25 | 20,54 / 0,385 | 24,96 / 0,584 | 26,17 / 0,669 | **29,62 / 0,837** |
-| Gaussiano σ = 50 | 15,01 / 0,193 | 22,61 / 0,481 | 23,23 / 0,567 | **25,04 / 0,633** |
-| Sal y pimienta 5 % | 17,97 / 0,419 | **28,88 / 0,858** | 24,84 / 0,645 | 21,80 / 0,516 |
+| Ruido | Sin filtrar | Mediana | Gaussiano | CNN v1 | **CNN v2** |
+|---|---|---|---|---|---|
+| Gaussiano σ = 15 | 24,83 | 26,96 | 28,04 | 30,94 | **31,68 / 0,877** |
+| Gaussiano σ = 25 | 20,54 | 24,96 | 26,17 | **29,62** | 29,11 / 0,812 |
+| Gaussiano σ = 50 | 15,01 | 22,61 | 23,23 | 25,04 | **25,20 / 0,644** |
+| Sal y pimienta 5 % | 17,97 | **28,88** | 24,84 | 21,80 | 19,51 |
+| Celular (ruido de cámara) | 29,09 | 26,57 | 27,08 | 29,15 | **30,97 / 0,879** |
 
-La CNN gana con ruido gaussiano (supera al gaussiano en 200 de 200 fotos con σ = 25). Con sal y pimienta gana
-la mediana: la red nunca vio ese ruido al entrenar.
+**Detalle:**
 
-**Diagnóstico automático** en 800 fotos de prueba degradadas:
+| Condición | Sin restaurar | Nitidez clásica | CNN v2 | **CNN v3** | Real-ESRGAN |
+|---|---|---|---|---|---|
+| Desenfoque σ 1,5 | 25,79 | 26,99 | **30,59** | 27,62 | 26,33 |
+| JPEG calidad 20 | 28,21 | 27,48 | **28,34** | 28,13 | 26,45 |
+| Muy borrosa (σ 3 → ×2 → JPEG 60) | 22,94 | 23,09 | 23,48 | **24,22** | 23,90 |
+| Celular (cámara → JPEG 85) | 28,80 | 27,61 | 28,64 | **29,45** | 25,95 |
 
-| Problema | MLP (nuestra) | Mejor umbral simple |
-|---|---|---|
-| Ruido | **88,4 %** | 78,7 % |
-| Desenfoque | **94,9 %** | 78,7 % |
-| Compresión JPEG | **100 %** | 99,8 % |
-| Los 3 correctos a la vez | **83,5 %** | 60,4 % |
+**Diagnóstico** (800 muestras de prueba): los 3 problemas correctos a la vez en **81,6 %** (MLP) contra 64,0 % (mejor
+umbral sobre una sola característica).
 
-Detalles, curvas y ejemplos en `results/` y `docs/experimentos.md`.
+**Sistema automático completo** (9 condiciones; `results/system_eval/bsds500_denoise_cnn_v2_detail_cnn_v3.md`):
+ruido σ 15 24,83 → **31,16** dB (mejora 194/200); foto oscura y ruidosa 12,97 → **21,93**; celular 28,80 → **29,70**
+(con métodos clásicos: 27,13); 167/200 fotos limpias quedan intactas. Modelos y umbrales se eligen en las 100 fotos
+de validación (`scripts/evaluate_system.py --split val`) y la prueba solo confirma.
 
 ## Instalación (Windows, PowerShell)
 
@@ -75,7 +68,7 @@ git clone https://github.com/DylanRC4/Proyecto-final---Mejora-de-Imagen-con-IA.g
 cd Proyecto-final---Mejora-de-Imagen-con-IA
 py -3.14 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe scripts\download_models.py    # Real-ESRGAN (4,9 MB, verifica SHA-256)
+.\.venv\Scripts\python.exe scripts\download_models.py    # opcional: Real-ESRGAN (solo herramientas manuales)
 .\.venv\Scripts\python.exe scripts\prepare_data.py       # opcional: fotos BSDS500 de ejemplo
 ```
 
@@ -85,46 +78,31 @@ py -3.14 -m venv .venv
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-Se abre en el navegador (`http://localhost:8501`). Carga una foto y usa **Mejora automática** o **Herramientas**.
+Si se cambia el código, hay que cerrar Streamlit y volver a abrirlo (los módulos quedan en memoria).
 
 ## Reproducir los experimentos
 
 ```powershell
-python -m pytest -q                       # pruebas
-python scripts\compare_classic.py        # ajusta mediana y gaussiano en validación
-python scripts\train.py                  # entrena la CNN de ruido (usa --bench 30 para medir velocidad)
-python scripts\evaluate.py               # evalúa en prueba contra los filtros clásicos
-python scripts\kernel_experiment.py      # kernel fijo contra kernel aprendido
-python scripts\train_diagnosis.py        # entrena y evalúa la MLP de diagnóstico
+python -m pytest -q                                           # 62 pruebas
+python scripts\prepare_div2k.py                               # DIV2K reducido ×2 (700/100/100)
+python scripts\train.py --config configs\train_noise_v2.json --name denoise_cnn_v2   # CNN de ruido v2
+python scripts\train.py --config configs\train_detail_v3.json --name detail_cnn_v3  # CNN de detalle v3
+python scripts\train_diagnosis.py                             # MLP de diagnóstico
+python scripts\evaluate.py; python scripts\evaluate_detail.py # evaluación de cada red
+python scripts\evaluate_system.py [--split val]               # sistema completo
 ```
 
-Todo usa semillas fijas y el split oficial de BSDS500 por fotografía (200 entrenamiento / 100 validación /
-200 prueba), así que los resultados se pueden repetir.
-
-## Estructura
-
-```
-imageenhance/   io_utils · noise · classic · enhance · metrics · analysis · data
-                model (CNN propia) · diagnosis (MLP propia) · external (Real-ESRGAN) · pipeline (modo automático)
-scripts/        prepare_data · compare_classic · train · evaluate · kernel_experiment · train_diagnosis · download_models
-models/         pesos entrenados por nosotros (+ external/, descargado, fuera de Git)
-results/        métricas, curvas y ejemplos
-docs/           arquitectura y registro de experimentos
-tests/          pruebas con pytest
-app.py          interfaz Streamlit
-```
+Todo usa semillas fijas y splits por fotografía (ninguna foto aparece en dos subconjuntos).
 
 ## Limitaciones
 
-- El ruido real de una cámara depende del brillo y no es exactamente gaussiano: en fotos reales la mejora es menor
-  que en los experimentos.
-- Real-ESRGAN inventa texturas creíbles: se ve más nítido pero puede dar un aspecto "pintado" y obtiene menos PSNR
-  que una ampliación bicúbica. Por eso su intensidad es ajustable y se evalúa a la vista.
-- Sin referencia no se puede distinguir un atardecer de una foto amarillenta: la corrección automática de color es conservadora.
-- No recupera desenfoques fuertes, fotos muy movidas ni rostros de muy pocos píxeles.
+- Entrenamos con degradaciones sintéticas; no medimos con un dataset de ruido real con referencia (PolyU, SIDD).
+- Luz y contraste son reglas y el color solo se avisa: el sistema corrige defectos, no "embellece".
+- Con grano grueso (3-6 px), con sal y pimienta y con desenfoque suave sin compresión (v3) el rendimiento baja.
+- Con todas las degradaciones juntas, el plan con métodos clásicos queda levemente mejor (18,21 contra 18,05 dB).
+- No recupera caras de pocos píxeles ni fotos muy movidas: eso solo lo hace una IA generativa, que no usamos.
 
 ## Créditos
 
-- BSDS500: Arbeláez et al., 2011 (uso académico), descargado del espejo `github.com/BIDS/BSDS500`.
-- Real-ESRGAN: Wang et al., 2021, `github.com/xinntao/Real-ESRGAN` (BSD-3).
-- DnCNN: Zhang et al., 2017, referencia de arquitectura.
+- BSDS500: Arbeláez et al., 2011 (uso académico). DIV2K: Agustsson y Timofte, 2017.
+- Real-ESRGAN: Wang et al., 2021, `github.com/xinntao/Real-ESRGAN` (BSD-3). DnCNN: Zhang et al., 2017.
