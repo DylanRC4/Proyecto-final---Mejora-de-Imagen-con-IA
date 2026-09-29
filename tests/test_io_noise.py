@@ -17,7 +17,7 @@ def test_to_uint8_hace_clip_y_no_da_la_vuelta():
 
 def test_bgr_rgb_invierte_canales(img):
     rgb = io.bgr_to_rgb(img)
-    assert np.array_equal(rgb[..., 0], img[..., 2]) and np.array_equal(io.rgb_to_bgr(rgb), img)
+    assert np.array_equal(rgb[..., 0], img[..., 2]) and np.array_equal(io.bgr_to_rgb(rgb), img)
 
 
 def test_gris_coincide_con_opencv(img):
@@ -28,7 +28,7 @@ def test_gris_coincide_con_opencv(img):
 
 def test_guardar_y_cargar_con_tildes(tmp_path, img):
     p = tmp_path / "prueba_señal.png"
-    io.save_bgr(p, img)
+    p.write_bytes(cv2.imencode(".png", io.to_uint8(img))[1].tobytes())
     assert np.array_equal(io.load_bgr(p), io.to_uint8(img))
 
 
@@ -51,7 +51,6 @@ def test_sal_pimienta_proporcion_y_no_modifica_original(img):
 
 
 def test_degradaciones_de_detalle(img):
-    rng = np.random.default_rng(0)
     assert noise.add_downscale(img, 2.0).shape == img.shape
     assert noise.fixed_detail(img).shape == img.shape
     a, b = noise.random_detail(img, np.random.default_rng(5)), noise.random_detail(img, np.random.default_rng(5))

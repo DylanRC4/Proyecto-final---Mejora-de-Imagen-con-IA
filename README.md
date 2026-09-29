@@ -89,7 +89,7 @@ Si se cambia el código, hay que cerrar Streamlit y volver a abrirlo (los módul
 ## Reproducir los experimentos
 
 ```powershell
-python -m pytest -q                                           # 66 pruebas
+python -m pytest -q                                           # 64 pruebas
 python scripts\prepare_div2k.py                               # DIV2K reducido ×2 (700/100/100)
 python scripts\train.py --config configs\train_noise_v2.json --name denoise_cnn_v2   # CNN de ruido v2
 python scripts\train.py --config configs\train_detail_v3.json --name detail_cnn_v3  # CNN de detalle v3

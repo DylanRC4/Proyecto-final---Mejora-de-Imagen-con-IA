@@ -27,7 +27,6 @@ ORIGEN = {"ruido": "Nuestra CNN de ruido (entrenada por nosotros)",
           "ampliar": "Bicúbica ×2 + nuestra CNN de detalle",
           "ampliar_externo": "Real-ESRGAN (externo, preentrenado, generativo)"}
 ORDEN = ["ruido", "detalle", "detalle_externo", "contraste", "luz", "retoque", "color", "nitidez", "ampliar", "ampliar_externo"]
-PROPIOS = [p for p in ORDEN if not p.endswith("_externo")]
 # CNN de detalle que usa la app: v3 (mezcla realista: ruido de cámara, JPEG, reducción y combinaciones).
 # Elegida en la ronda 4 (aún con color automático) con el sistema completo en VALIDACIÓN (100 fotos) y confirmada:
 # foto muy borrosa ("fuerte") 22.35 dB vs 21.41 de la v2 (mejor en 96/100 fotos; prueba: 22.71 vs 21.87);

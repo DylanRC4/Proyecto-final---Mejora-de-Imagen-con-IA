@@ -42,3 +42,7 @@ Claude outputs/
 
 # Ejemplos pesados de la evaluación de ruido (38 MB; se regeneran con scripts/evaluate.py)
 results/noise_eval/examples_*/
+
+# Guías de sustentación (material de estudio del equipo): se guardan en Descargas, nunca en el repositorio
+*.docx
+docs/sustentacion.md

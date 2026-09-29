@@ -10,10 +10,6 @@ Todas las funciones reciben y devuelven float32 en [0, 1] con forma (H, W) o (H,
 import cv2
 import numpy as np
 
-# Laplaciano discreto: identidad + este kernel da el kernel de realce de la Sesión 01 (5 al centro).
-LAPLACIAN = np.array([[0, -1, 0], [-1, 4, -1], [0, -1, 0]], dtype=np.float32)
-
-
 def conv2d(img: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     """Convolución 2D propia en NumPy, canal por canal, con el mismo borde que OpenCV (reflect-101).
 
@@ -62,22 +58,6 @@ def median_filter(img: np.ndarray, ksize: int = 3) -> np.ndarray:
         return cv2.medianBlur(img.astype(np.float32), ksize)
     u8 = np.clip(np.rint(img * 255), 0, 255).astype(np.uint8)
     return cv2.medianBlur(u8, ksize).astype(np.float32) / 255.0
-
-
-def adjust_brightness_contrast(img: np.ndarray, alpha: float = 1.0, beta: float = 0.0) -> np.ndarray:
-    """Transformación afín A' = alfa*A + beta (Sesión 01). alfa = contraste, beta = brillo en escala 0-255."""
-    return np.clip(alpha * img + beta / 255.0, 0.0, 1.0)
-
-
-def sharpen(img: np.ndarray, amount: float = 1.0) -> np.ndarray:
-    """Realce de nitidez con el kernel identidad + amount*Laplaciano (amount=1 es el kernel de la Sesión 01).
-
-    Los coeficientes suman 1, así que las zonas planas no cambian; solo actúa donde hay contraste.
-    Ojo: también amplifica el ruido, por eso se aplica DESPUÉS de eliminarlo.
-    """
-    k = amount * LAPLACIAN
-    k[1, 1] += 1.0
-    return np.clip(conv2d(img, k), 0.0, 1.0)
 
 
 def apply(img: np.ndarray, method: str, **params) -> np.ndarray:

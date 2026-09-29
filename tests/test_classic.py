@@ -33,15 +33,3 @@ def test_mediana_elimina_sal_y_pimienta_mejor_que_gaussiano(img):
     err = lambda x: np.abs(x - img).mean()
     assert err(classic.median_filter(sp, 3)) < err(classic.gaussian_filter(sp, 3, 0.8)) < err(sp)
     assert classic.median_filter(sp, 7).shape == img.shape
-
-
-def test_afin_brillo_contraste():
-    a = np.array([0.4, 0.6], np.float32)
-    out = classic.adjust_brightness_contrast(a, alpha=0.5, beta=-50)
-    assert out[1] - out[0] == pytest.approx(0.1, abs=1e-6)  # la amplitud se reduce a la mitad
-    assert classic.adjust_brightness_contrast(np.ones(2, np.float32), 2.0, 50).max() == 1.0
-
-
-def test_realce_no_cambia_zonas_planas():
-    flat = np.full((10, 10, 3), 0.5, np.float32)
-    assert np.allclose(classic.sharpen(flat), flat)

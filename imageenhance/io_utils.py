@@ -25,16 +25,6 @@ def load_bgr(path) -> np.ndarray:
     return decode_bytes(Path(path).read_bytes())
 
 
-def save_bgr(path, img: np.ndarray) -> None:
-    """Guarda una imagen BGR (uint8 o float en [0, 1]) respetando rutas con tildes."""
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    ok, buf = cv2.imencode(path.suffix or ".png", to_uint8(img) if img.dtype != np.uint8 else img)
-    if not ok:
-        raise ValueError(f"No se pudo codificar {path}")
-    path.write_bytes(buf.tobytes())
-
-
 def to_float(img: np.ndarray) -> np.ndarray:
     """uint8 [0, 255] -> float32 [0, 1]. Se calcula en float para no perder decimales (Sesión 01)."""
     return img.astype(np.float32) / 255.0
@@ -48,9 +38,6 @@ def to_uint8(img: np.ndarray) -> np.ndarray:
 def bgr_to_rgb(img: np.ndarray) -> np.ndarray:
     """Invierte el eje de canales (BGR <-> RGB). Streamlit y Matplotlib esperan RGB."""
     return np.ascontiguousarray(img[..., ::-1])
-
-
-rgb_to_bgr = bgr_to_rgb
 
 
 def to_gray(img_bgr: np.ndarray) -> np.ndarray:
