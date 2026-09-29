@@ -1,0 +1,30 @@
+# Tema de Revela: colores de la Institución Universitaria de Colombia (azul #030568, amarillo #FACC15).
+# Fuentes incluidas en Streamlit (no se descargan): la app funciona sin internet.
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#030568"
+backgroundColor = "#F6F7FB"
+secondaryBackgroundColor = "#E9EBF4"
+textColor = "#15173D"
+borderColor = "#D5D8E6"
+font = "sans-serif"
+headingFont = "serif"
+headingFontWeights = 700
+baseRadius = "small"
+showWidgetBorder = true
+dataframeHeaderBackgroundColor = "#E9EBF4"
+chartCategoricalColors = ["#030568", "#FACC15", "#8A8FC4"]
+
+[theme.sidebar]
+backgroundColor = "#030568"
+secondaryBackgroundColor = "#0F148A"
+textColor = "#FFFFFF"
+primaryColor = "#FACC15"
+borderColor = "#2A2F9A"

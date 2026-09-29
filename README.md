@@ -1,4 +1,4 @@
-# ImageEnhance AI
+# Revela
 
 Software en Python que **analiza una fotografía, detecta qué problemas tiene y la mejora automáticamente**
 con redes neuronales entrenadas por nosotros y procesamiento digital de imágenes clásico. Nada es generativo:
@@ -19,8 +19,10 @@ Autores: Dylan Esteban Ricaurte Cuervo · Brayan Sneyder Garcia Camacho · Nicol
 5. **Color:** un detector con umbral no distingue la luz de la escena (atardecer, faroles) de un defecto (se equivocaba en
    33 de 100 fotos modernas limpias de DIV2K); el retoque aprendido sí lo resuelve porque aprendió de un fotógrafo.
    Si se detecta una posible dominante, la app avisa y ofrece además el balance de blancos clásico.
-6. **Interfaz:** antes/después, **lupa ×3** de la zona que más cambió, tabla de pasos con su origen y, en el modo
-   experimento, PSNR y SSIM contra la foto limpia.
+6. **Interfaz** (`app.py`; estilos en `imageenhance/ui.py` y colores de la universidad en `.streamlit/config.toml`):
+   foto a la izquierda y panel a la derecha; antes/después con **deslizador**, lado a lado o **lupa ×3** de la zona que
+   más cambió; los pasos aplicados con su origen (nuestra IA, clásico o externo) y, en el modo experimento, PSNR y SSIM
+   contra la foto limpia.
 
 ## Modelos
 
@@ -74,8 +76,16 @@ git clone https://github.com/DylanRC4/Proyecto-final---Mejora-de-Imagen-con-IA.g
 cd Proyecto-final---Mejora-de-Imagen-con-IA
 py -3.14 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe scripts\download_models.py    # opcional: Real-ESRGAN (solo herramientas manuales)
+.\.venv\Scripts\python.exe scripts\download_models.py    # opcional: Real-ESRGAN (solo en Ajuste manual)
 .\.venv\Scripts\python.exe scripts\prepare_data.py       # opcional: fotos BSDS500 de ejemplo
+```
+
+En Linux, instalar primero PyTorch para CPU (evita descargar CUDA) y usar `.venv/bin/python`:
+
+```bash
+python -m venv .venv
+.venv/bin/python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
 ## Uso

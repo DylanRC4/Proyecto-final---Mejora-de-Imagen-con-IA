@@ -43,7 +43,7 @@ def plan(problemas: dict, retoque: bool = False) -> list[str]:
     """Traduce el diagnóstico en pasos, siempre en el orden de ORDEN. El COLOR no entra en el modo automático:
     en DIV2K val (fotos modernas limpias: atardeceres, faroles, girasoles) el detector se equivoca en 33 de 100 y
     ningún umbral sirve (con 0.5: 6 % de falsas alarmas, pero detecta solo el 2 % de las dominantes). Sin la foto
-    original no se distingue la luz de la escena de un defecto: la app solo avisa y el usuario decide (Herramientas).
+    original no se distingue la luz de la escena de un defecto: la app solo avisa y el usuario decide (pestaña Ajuste manual).
     Con retoque=True, luz y contraste los decide la CNN de retoque (FiveK) en vez de las reglas: en las 498 fotos de
     prueba de FiveK, contra el experto C, 17,91 dB sin tocar → 19,90 con las reglas → 24,47 con el retoque."""
     luz = problemas["oscura"] or problemas["sobreexpuesta"]
