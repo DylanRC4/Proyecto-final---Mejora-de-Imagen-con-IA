@@ -74,3 +74,17 @@ def test_exposicion_fisica_y_dominante(img):
     assert osc.mean() < 0.6 * img.mean() and quem.max() > 0.999 and quem.mean() > img.mean()
     cast = noise.add_cast(img).reshape(-1, 3).mean(0)
     assert cast[0] < img.reshape(-1, 3).mean(0)[0] and cast[2] > img.reshape(-1, 3).mean(0)[2] * 1.05
+
+
+def test_ruido_de_camara_reproducible_y_mas_fuerte_en_sombras(img):
+    a = noise.add_camera_noise(img, np.random.default_rng(0), 3e-3)
+    assert a.shape == img.shape and np.array_equal(a, noise.add_camera_noise(img, np.random.default_rng(0), 3e-3))
+    plano = lambda v: noise.add_camera_noise(np.full((64, 64, 3), v, np.float32), np.random.default_rng(1), 3e-3).std()
+    assert plano(0.1) > plano(0.8)  # en sRGB las sombras quedan más ruidosas, como en una foto nocturna
+
+
+def test_mezcla_v3_y_ruido_v2(img):
+    rng = np.random.default_rng(0)
+    assert 5 <= sum(np.array_equal(noise.random_detail_v3(img, rng), img) for _ in range(200)) <= 30
+    assert all(f(img, 3).shape == img.shape for f in noise.VAL_DETAIL_V3 + noise.VAL_NOISE_V2)
+    assert noise.random_noise_v2(img, rng).shape == img.shape

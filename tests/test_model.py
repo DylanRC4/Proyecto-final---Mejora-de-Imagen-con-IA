@@ -40,3 +40,15 @@ def test_guardar_y_cargar(tmp_path, img):
     M.save(net, tmp_path / "m.pt", epoch=1, val_psnr=30.5)
     net2, meta = M.load(tmp_path / "m.pt")
     assert meta["epoch"] == 1 and np.allclose(M.denoise(net, img), M.denoise(net2, img))
+
+
+def test_red_nueva_arranca_como_identidad_y_sin_neuronas_muertas():
+    torch.manual_seed(0)
+    net = M.DenoiseCNN(3, 16, 16).eval()
+    x = torch.rand(2, 3, 32, 32)
+    with torch.no_grad():
+        assert torch.equal(net(x), x)  # última capa en cero: antes de entrenar no cambia la foto
+        h = x
+        for m in list(net.noise_net)[:-1]:
+            h = m(h)
+        assert h.std() > 0.05  # con inicialización He la señal llega viva a la penúltima capa

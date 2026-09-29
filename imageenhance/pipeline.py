@@ -1,8 +1,8 @@
 """Modo automático: con el diagnóstico decide qué mejoras aplicar y en qué ORDEN.
 
 El orden importa: primero se quita el ruido, porque aclarar, contrastar o dar nitidez lo
-amplifican; después se recupera el detalle; al final se corrigen contraste, luz y color, que
-son ajustes globales. Cada paso registra de dónde viene (nuestra IA, clásico o externo).
+amplifican; después se recupera el detalle; al final se corrigen contraste y luz, que son
+ajustes globales. El color solo se AVISA (ver plan). Cada paso registra de dónde viene (nuestra IA, clásico o externo).
 Tono: primero niveles (punto negro y blanco), porque subexponer una foto la escala casi
 linealmente y los niveles lo deshacen sin crear el "velo gris" que deja la gamma sobre negros
 levantados; después se VUELVE A MEDIR la foto y la gamma y el color solo actúan si el problema sigue.
@@ -27,16 +27,26 @@ ORIGEN = {"ruido": "Nuestra CNN de ruido (entrenada por nosotros)",
           "ampliar_externo": "Real-ESRGAN (externo, preentrenado, generativo)"}
 ORDEN = ["ruido", "detalle", "detalle_externo", "contraste", "luz", "color", "nitidez", "ampliar", "ampliar_externo"]
 PROPIOS = [p for p in ORDEN if not p.endswith("_externo")]
-# CNN de detalle que usa la app. v2 elegida en las 200 fotos de prueba (results/detail_eval): supera a la v1 en
-# desenfoque (30.59 vs 28.22 dB), JPEG (mejora 163/200 fotos vs 34/200) y baja resolución; la v1 solo gana en "fija".
-DETAIL_MODEL = "detail_cnn_v2.pt"
+# CNN de detalle que usa la app: v3 (mezcla realista: ruido de cámara, JPEG, reducción y combinaciones).
+# Elegida con el sistema automático completo en VALIDACIÓN (BSDS500 val, 100 fotos) y confirmada en prueba:
+# foto muy borrosa ("fuerte") 22.35 dB vs 21.41 de la v2 (mejor en 96/100 fotos; prueba: 22.71 vs 21.87);
+# en el resto empatan (diferencia <= 0.06 dB). Costo: es más profunda (16 capas, ~15 % más lenta) y con
+# desenfoque suave SIN compresión rinde menos que la v2 (27.62 vs 30.59 dB en results/detail_eval).
+DETAIL_MODEL = "detail_cnn_v3.pt"
+# CNN de ruido que usa la app. v2 (gaussiano + ruido de cámara) elegida en las 200 fotos de prueba
+# (results/noise_eval): con ruido de celular sube de 29.09 a 30.97 dB (la v1 se queda en 29.15, casi no lo ve);
+# gaussiano sigma 15: 31.68 vs 30.94; sigma 50: 25.20 vs 25.04; solo pierde en sigma 25 (29.11 vs 29.62).
+NOISE_MODEL = "denoise_cnn_v2.pt"
 
 
 def plan(problemas: dict) -> list[str]:
-    """Traduce el diagnóstico en pasos, siempre en el orden de ORDEN."""
+    """Traduce el diagnóstico en pasos, siempre en el orden de ORDEN. El COLOR no entra en el modo automático:
+    en DIV2K val (fotos modernas limpias: atardeceres, faroles, girasoles) el detector se equivoca en 33 de 100 y
+    ningún umbral sirve (con 0.5: 6 % de falsas alarmas, pero detecta solo el 2 % de las dominantes). Sin la foto
+    original no se distingue la luz de la escena de un defecto: la app solo avisa y el usuario decide (Herramientas)."""
     luz = problemas["oscura"] or problemas["sobreexpuesta"]
     quiere = {"ruido": problemas["ruido"], "detalle": problemas["desenfoque"] or problemas["compresion"],
-              "contraste": problemas["poco_contraste"] or luz, "luz": luz, "color": problemas["dominante_color"]}
+              "contraste": problemas["poco_contraste"] or luz, "luz": luz}
     return [p for p in ORDEN if quiere.get(p)]
 
 

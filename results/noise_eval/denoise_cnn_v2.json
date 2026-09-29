@@ -1,0 +1,133 @@
+{
+ "model": "models\\denoise_cnn_v2.pt",
+ "model_epoch": 40,
+ "test_images": 200,
+ "classic_params": {
+  "gaussian_15_median": {
+   "ksize": 3
+  },
+  "gaussian_15_gaussian": {
+   "ksize": 7,
+   "sigma": 0.8
+  },
+  "gaussian_25_median": {
+   "ksize": 3
+  },
+  "gaussian_25_gaussian": {
+   "ksize": 7,
+   "sigma": 0.8
+  },
+  "gaussian_50_median": {
+   "ksize": 7
+  },
+  "gaussian_50_gaussian": {
+   "ksize": 11,
+   "sigma": 1.5
+  },
+  "salt_pepper_0.05_median": {
+   "ksize": 3
+  },
+  "salt_pepper_0.05_gaussian": {
+   "ksize": 9,
+   "sigma": 1.1
+  }
+ },
+ "seconds": 302.0,
+ "results": {
+  "gaussian_15": {
+   "sin_filtro": {
+    "psnr": 24.8289135,
+    "ssim": 0.562589
+   },
+   "mediana": {
+    "psnr": 26.963468000000002,
+    "ssim": 0.714273
+   },
+   "gaussiano": {
+    "psnr": 28.035690999999996,
+    "ssim": 0.784865
+   },
+   "cnn": {
+    "psnr": 31.681459999999998,
+    "ssim": 0.8766534999999999
+   },
+   "cnn_gana_a_gaussiano_en": "200/200"
+  },
+  "gaussian_25": {
+   "sin_filtro": {
+    "psnr": 20.539334,
+    "ssim": 0.38454350000000004
+   },
+   "mediana": {
+    "psnr": 24.959771,
+    "ssim": 0.583587
+   },
+   "gaussiano": {
+    "psnr": 26.167855999999997,
+    "ssim": 0.668913
+   },
+   "cnn": {
+    "psnr": 29.110516499999996,
+    "ssim": 0.811781
+   },
+   "cnn_gana_a_gaussiano_en": "200/200"
+  },
+  "gaussian_50": {
+   "sin_filtro": {
+    "psnr": 15.0109875,
+    "ssim": 0.19282049999999998
+   },
+   "mediana": {
+    "psnr": 22.606416,
+    "ssim": 0.48050750000000003
+   },
+   "gaussiano": {
+    "psnr": 23.232013,
+    "ssim": 0.566734
+   },
+   "cnn": {
+    "psnr": 25.2007675,
+    "ssim": 0.6442869999999999
+   },
+   "cnn_gana_a_gaussiano_en": "194/200"
+  },
+  "salt_pepper_0.05": {
+   "sin_filtro": {
+    "psnr": 17.9713275,
+    "ssim": 0.41941
+   },
+   "mediana": {
+    "psnr": 28.877799000000003,
+    "ssim": 0.85795
+   },
+   "gaussiano": {
+    "psnr": 24.842151000000005,
+    "ssim": 0.644513
+   },
+   "cnn": {
+    "psnr": 19.5141515,
+    "ssim": 0.46360300000000004
+   },
+   "cnn_gana_a_gaussiano_en": "0/200"
+  },
+  "camara_0.003": {
+   "sin_filtro": {
+    "psnr": 29.094641000000003,
+    "ssim": 0.8043349999999999
+   },
+   "mediana": {
+    "psnr": 26.5656035,
+    "ssim": 0.734607
+   },
+   "gaussiano": {
+    "psnr": 27.07745,
+    "ssim": 0.7726529999999999
+   },
+   "cnn": {
+    "psnr": 30.967965,
+    "ssim": 0.879239
+   },
+   "cnn_gana_a_gaussiano_en": "200/200"
+  }
+ }
+}

@@ -6,6 +6,8 @@ Condiciones (todas deterministas):
   desenfoque desenfoque gaussiano σ = 1.5
   jpeg       compresión JPEG calidad 20
   baja_res   reducción ×2 y ampliación bicúbica
+  fuerte     desenfoque 3.0 → reducción ×2 → JPEG 60 (como una foto de celular muy borrosa)
+  celular    ruido de cámara (a = 0.003, semilla por foto) → JPEG 85
 La intensidad de la nitidez clásica se elige en VALIDACIÓN (30 fotos), como se hizo con los filtros de ruido.
 
 Uso:  python scripts/evaluate_detail.py [--model models/detail_cnn_v2.pt] [--dataset bsds500|div2k] [--limit N]
@@ -24,14 +26,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from imageenhance import data, enhance, external, metrics, model as M, noise  # noqa: E402
 from imageenhance.io_utils import bgr_to_rgb  # noqa: E402
 
-CONDITIONS = {"fija": noise.fixed_detail, "desenfoque": lambda x: noise.add_blur(x, 1.5),
-              "jpeg": lambda x: noise.add_jpeg(x, 20), "baja_res": lambda x: noise.add_downscale(x, 2.0)}
+CONDITIONS = {"fija": lambda x, n: noise.fixed_detail(x), "desenfoque": lambda x, n: noise.add_blur(x, 1.5),
+              "jpeg": lambda x, n: noise.add_jpeg(x, 20), "baja_res": lambda x, n: noise.add_downscale(x, 2.0),
+              "fuerte": lambda x, n: noise.add_jpeg(noise.add_downscale(noise.add_blur(x, 3.0), 2.0), 60),
+              "celular": lambda x, n: noise.add_jpeg(noise.degrade(x, "camara", 0.003, data.noise_seed(n, "camara", 0.003)), 85)}
 AMOUNTS = (0.3, 0.6, 1.0, 1.5)
 EXAMPLES = 2
 
 
 def best_amount(degrade, imgs):
-    scores = {a: np.mean([metrics.psnr(im, enhance.unsharp(degrade(im), a)) for _, im in imgs]) for a in AMOUNTS}
+    scores = {a: np.mean([metrics.psnr(im, enhance.unsharp(degrade(im, n), a)) for n, im in imgs]) for a in AMOUNTS}
     return max(scores, key=scores.get)
 
 
@@ -71,7 +75,7 @@ def main() -> None:
     for cond, degrade in CONDITIONS.items():
         amounts[cond] = best_amount(degrade, val)
         for idx, (name, clean) in enumerate(test):
-            deg = degrade(clean)
+            deg = degrade(clean, name).astype(np.float32)
             outs = {"sin_restaurar": deg, "nitidez_clasica": enhance.unsharp(deg, amounts[cond]), "cnn_detalle": M.denoise(net, deg)}
             if esrgan is not None:
                 outs["real_esrgan"] = external.restore(esrgan, deg)

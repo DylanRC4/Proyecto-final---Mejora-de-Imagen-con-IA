@@ -1,0 +1,210 @@
+{
+ "dataset": "bsds500",
+ "split": "test",
+ "noise_model": "models/denoise_cnn_v2.pt",
+ "detail_model": "models/detail_cnn_v3.pt",
+ "test_images": 200,
+ "clasico_ruido": {
+  "ksize": 7,
+  "sigma": 0.8
+ },
+ "seconds": 769.9,
+ "results": {
+  "limpia": {
+   "sin_procesar": {
+    "psnr": 60.0,
+    "ssim": 1.0
+   },
+   "sistema": {
+    "psnr": 55.457960500000006,
+    "ssim": 0.985785
+   },
+   "sistema_clasico": {
+    "psnr": 54.440619500000004,
+    "ssim": 0.9731065
+   },
+   "mejora": "0/200",
+   "empeora": "33/200",
+   "planes_mas_comunes": {
+    "(nada)": 167,
+    "ruido": 26,
+    "contraste → luz": 6
+   },
+   "segundos_por_foto": 0.055
+  },
+  "ruido": {
+   "sin_procesar": {
+    "psnr": 24.828775500000003,
+    "ssim": 0.5626209999999999
+   },
+   "sistema": {
+    "psnr": 31.163518999999997,
+    "ssim": 0.8681544999999999
+   },
+   "sistema_clasico": {
+    "psnr": 27.560704,
+    "ssim": 0.7690739999999999
+   },
+   "mejora": "194/200",
+   "empeora": "5/200",
+   "planes_mas_comunes": {
+    "ruido": 168,
+    "ruido → detalle": 26,
+    "ruido → contraste → luz": 4
+   },
+   "segundos_por_foto": 0.238
+  },
+  "oscura_ruidosa": {
+   "sin_procesar": {
+    "psnr": 12.967975,
+    "ssim": 0.47252599999999995
+   },
+   "sistema": {
+    "psnr": 21.928501500000003,
+    "ssim": 0.714224
+   },
+   "sistema_clasico": {
+    "psnr": 21.307295999999997,
+    "ssim": 0.6432990000000001
+   },
+   "mejora": "190/200",
+   "empeora": "10/200",
+   "planes_mas_comunes": {
+    "ruido → contraste → luz": 129,
+    "ruido → detalle → contraste → luz": 71
+   },
+   "segundos_por_foto": 0.373
+  },
+  "desenfoque_jpeg": {
+   "sin_procesar": {
+    "psnr": 26.098765000000004,
+    "ssim": 0.7447155000000001
+   },
+   "sistema": {
+    "psnr": 25.823506500000004,
+    "ssim": 0.745901
+   },
+   "sistema_clasico": {
+    "psnr": 25.409015,
+    "ssim": 0.7399425
+   },
+   "mejora": "167/200",
+   "empeora": "29/200",
+   "planes_mas_comunes": {
+    "detalle": 158,
+    "ruido → detalle": 26,
+    "detalle → contraste → luz": 13
+   },
+   "segundos_por_foto": 0.491
+  },
+  "oscura_velo": {
+   "sin_procesar": {
+    "psnr": 14.3021725,
+    "ssim": 0.7869869999999999
+   },
+   "sistema": {
+    "psnr": 24.0071585,
+    "ssim": 0.8880060000000001
+   },
+   "sistema_clasico": {
+    "psnr": 23.958457500000005,
+    "ssim": 0.8875139999999999
+   },
+   "mejora": "183/200",
+   "empeora": "15/200",
+   "planes_mas_comunes": {
+    "contraste → luz": 191,
+    "detalle → contraste → luz": 5,
+    "ruido → contraste → luz": 3
+   },
+   "segundos_por_foto": 0.069
+  },
+  "dominante": {
+   "sin_procesar": {
+    "psnr": 24.4612035,
+    "ssim": 0.9784694999999999
+   },
+   "sistema": {
+    "psnr": 24.035507000000003,
+    "ssim": 0.9647835
+   },
+   "sistema_clasico": {
+    "psnr": 23.902424999999997,
+    "ssim": 0.95443
+   },
+   "mejora": "0/200",
+   "empeora": "28/200",
+   "planes_mas_comunes": {
+    "(nada)": 171,
+    "ruido": 23,
+    "contraste → luz": 5
+   },
+   "segundos_por_foto": 0.045
+  },
+  "todo": {
+   "sin_procesar": {
+    "psnr": 14.6286445,
+    "ssim": 0.5692175
+   },
+   "sistema": {
+    "psnr": 18.047342,
+    "ssim": 0.6002095
+   },
+   "sistema_clasico": {
+    "psnr": 18.212656000000003,
+    "ssim": 0.6076425000000001
+   },
+   "mejora": "157/200",
+   "empeora": "16/200",
+   "planes_mas_comunes": {
+    "ruido → detalle → contraste → luz": 135,
+    "ruido → detalle": 65
+   },
+   "segundos_por_foto": 0.577
+  },
+  "celular": {
+   "sin_procesar": {
+    "psnr": 28.8021645,
+    "ssim": 0.795735
+   },
+   "sistema": {
+    "psnr": 29.6975205,
+    "ssim": 0.849415
+   },
+   "sistema_clasico": {
+    "psnr": 27.125477,
+    "ssim": 0.7788595
+   },
+   "mejora": "159/200",
+   "empeora": "6/200",
+   "planes_mas_comunes": {
+    "ruido": 158,
+    "(nada)": 35,
+    "ruido → contraste → luz": 4
+   },
+   "segundos_por_foto": 0.136
+  },
+  "fuerte": {
+   "sin_procesar": {
+    "psnr": 22.942133000000002,
+    "ssim": 0.576426
+   },
+   "sistema": {
+    "psnr": 22.7806145,
+    "ssim": 0.6141975
+   },
+   "sistema_clasico": {
+    "psnr": 21.588516,
+    "ssim": 0.560267
+   },
+   "mejora": "168/200",
+   "empeora": "32/200",
+   "planes_mas_comunes": {
+    "detalle": 168,
+    "detalle → contraste → luz": 27,
+    "detalle → contraste": 5
+   },
+   "segundos_por_foto": 0.432
+  }
+ }
+}

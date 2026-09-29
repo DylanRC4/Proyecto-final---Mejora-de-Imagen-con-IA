@@ -2,8 +2,8 @@
 
 Datos: cada foto de BSDS500 se degrada K veces con una combinación aleatoria (semilla fija), en el
 orden de una cámara (lente → exposición → sensor → compresión):
-  desenfoque (p=0.5, sigma 1-3) → exposición (p=0.5, −2 a +1 EV) y dominante de color (p=0.3, ±10-25 %),
-  ambas sin etiqueta → ruido (p=0.5, sigma 8-40)
+  desenfoque (p=0.5, sigma 1-4) → exposición (p=0.5, −2 a +1 EV) y dominante de color (p=0.3, ±10-25 %),
+  ambas sin etiqueta → ruido (p=0.5: mitad gaussiano sigma 8-40, mitad ruido de CÁMARA a 5e-4 a 1e-2)
   → JPEG (p=0.5, calidad 8-50; si no, p=0.5 de JPEG bueno 75-95, que NO cuenta como problema).
 La etiqueta es qué se aplicó. Exposición, dominante y JPEG bueno son "distractores": la v1 del MLP no
 los veía; en la evaluación del sistema no detectaba el ruido en fotos oscuras con JPEG 50 y confundía
@@ -40,7 +40,7 @@ def make_split(split, limit):
             y = rng.random(3) < 0.5  # ruido, desenfoque, compresión
             x = img
             if y[1]:
-                x = noise.add_blur(x, rng.uniform(1.0, 3.0))
+                x = noise.add_blur(x, rng.uniform(1.0, 4.0))
             if rng.random() < 0.5:
                 x = noise.add_exposure(x, rng.uniform(-2.0, 1.0))
             if rng.random() < 0.3:
@@ -49,7 +49,9 @@ def make_split(split, limit):
                 m = rng.uniform(0.10, 0.25)
                 gains[a], gains[b] = 1 + m, 1 - m
                 x = noise.add_cast(x, gains)
-            if y[0]:
+            if y[0] and rng.random() < 0.5:  # ruido de celular: granulado y más fuerte en las sombras
+                x = noise.add_camera_noise(x, rng, float(np.exp(rng.uniform(np.log(5e-4), np.log(1e-2)))))
+            elif y[0]:
                 x = noise.add_gaussian(x, rng.uniform(8, 40), seed=int(rng.integers(1 << 31)))
             if y[2]:
                 x = noise.add_jpeg(x, int(rng.integers(8, 51)))

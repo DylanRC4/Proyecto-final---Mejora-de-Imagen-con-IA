@@ -1,0 +1,36 @@
+{
+ "config": {
+  "task": "detail",
+  "detail_mix": "v3",
+  "dataset": "div2k",
+  "seed": 2026,
+  "features": 48,
+  "depth": 16,
+  "patch": 64,
+  "patches_per_image": 10,
+  "batch": 32,
+  "epochs": 30,
+  "lr": 0.001,
+  "lr_min": 1e-05,
+  "val_crop": 256
+ },
+ "env": {
+  "python": "3.14.6",
+  "torch": "2.14.0+cpu",
+  "threads": 6,
+  "device": "cpu",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "processor": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "dataset": "div2k",
+  "dataset_source": "https://data.vision.ee.ethz.ch/cvl/DIV2K/",
+  "params": 293619,
+  "train_images": 700,
+  "val_images": 100,
+  "val_noisy_psnr": 25.4503,
+  "val_noisy_ssim": 0.7112,
+  "finished_epochs": 30,
+  "best_val_psnr": 26.235,
+  "updated": "2026-09-29T02:26:30",
+  "session_minutes": 126.1
+ }
+}

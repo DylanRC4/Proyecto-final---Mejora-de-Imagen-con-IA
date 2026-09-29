@@ -1,0 +1,17 @@
+{
+ "seed": 2026,
+ "features": 32,
+ "depth": 10,
+ "patch": 64,
+ "patches_per_image": 10,
+ "batch": 32,
+ "epochs": 40,
+ "lr": 0.001,
+ "lr_min": 1e-05,
+ "sigma_min": 5,
+ "sigma_max": 50,
+ "val_sigma": 25,
+ "val_crop": 256,
+ "noise_mix": "v2",
+ "dataset": "div2k"
+}

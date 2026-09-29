@@ -2,8 +2,9 @@
 
 Dos tareas, según "task" en la configuración:
 - "noise" (configs/train.json): ruido gaussiano con sigma aleatorio en [sigma_min, sigma_max].
-- "detail" (configs/train_detail.json): desenfoque, baja resolución, poco ruido y JPEG aleatorios
-  (noise.random_detail). Se entrena con MSE: la red no inventa texturas, solo recupera lo deducible.
+- "detail" (configs/train_detail*.json): desenfoque, baja resolución, ruido y JPEG aleatorios
+  (noise.random_detail, _v2 o _v3). Se entrena con MSE: la red no inventa texturas, solo recupera lo deducible.
+- "noise_mix": "v2" mezcla ruido gaussiano y ruido de cámara (noise.random_noise_v2).
 En cada época se recortan `patches_per_image` parches aleatorios de CADA foto de entrenamiento
 (con giros/espejos). Todo sale de un generador con semilla (seed, época): es reproducible.
 Validación: recorte central de cada foto de validación con degradación fija.
@@ -42,9 +43,10 @@ def make_epoch(train_imgs, cfg, epoch):
     rng = np.random.default_rng([cfg["seed"], epoch])
     clean = np.concatenate([data.random_patches(im, cfg["patches_per_image"], cfg["patch"], rng) for _, im in train_imgs])
     clean = clean[rng.permutation(len(clean))].astype(np.float32) / 255.0
-    if cfg.get("task", "noise") == "detail":
-        degrade = noise.random_detail_v2 if cfg.get("detail_mix") == "v2" else noise.random_detail
-        noisy = np.stack([degrade(p, rng) for p in clean])
+    if cfg.get("task", "noise") == "detail" or cfg.get("noise_mix") == "v2":
+        degrade = {"v2": noise.random_detail_v2, "v3": noise.random_detail_v3}.get(cfg.get("detail_mix"), noise.random_detail)
+        degrade = noise.random_noise_v2 if cfg.get("noise_mix") == "v2" else degrade
+        noisy = np.stack([degrade(p, rng) for p in clean]).astype(np.float32)
     else:
         sigma = rng.uniform(cfg["sigma_min"], cfg["sigma_max"], (len(clean), 1, 1, 1)).astype(np.float32) / 255.0
         noisy = np.clip(clean + rng.standard_normal(clean.shape, dtype=np.float32) * sigma, 0.0, 1.0)
@@ -58,7 +60,10 @@ def build_val(cfg, limit=None):
         y, x = (im.shape[0] - c) // 2, (im.shape[1] - c) // 2
         crop = im[y:y + c, x:x + c]
         clean.append(crop)
-        if cfg.get("task", "noise") == "detail" and cfg.get("detail_mix") == "v2":
+        fixed = {"v3": noise.VAL_DETAIL_V3}.get(cfg.get("detail_mix")) or (noise.VAL_NOISE_V2 if cfg.get("noise_mix") == "v2" else None)
+        if fixed:
+            noisy.append(fixed[i % len(fixed)](crop, i).astype(np.float32))  # validación equilibrada: rota entre casos fijos
+        elif cfg.get("task", "noise") == "detail" and cfg.get("detail_mix") == "v2":
             noisy.append(noise.VAL_DETAIL[i % 4](crop))  # validación equilibrada: rota entre 4 casos fijos
         elif cfg.get("task", "noise") == "detail":
             noisy.append(noise.fixed_detail(crop))

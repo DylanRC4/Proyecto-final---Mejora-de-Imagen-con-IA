@@ -4,67 +4,67 @@
   "val": 400,
   "test": 800
  },
- "mejor_epoca": 453,
- "val_loss": 0.1256,
+ "mejor_epoca": 319,
+ "val_loss": 0.1331,
  "test_mlp": {
   "ruido": {
-   "exactitud": 0.9038,
-   "precision": 0.916,
-   "recall": 0.8858,
-   "f1": 0.9006
+   "exactitud": 0.8775,
+   "precision": 0.87,
+   "recall": 0.8832,
+   "f1": 0.8766
   },
   "desenfoque": {
-   "exactitud": 0.9313,
-   "precision": 0.941,
-   "recall": 0.9141,
-   "f1": 0.9273
+   "exactitud": 0.94,
+   "precision": 0.9468,
+   "recall": 0.9271,
+   "f1": 0.9368
   },
   "compresion": {
-   "exactitud": 0.995,
-   "precision": 1.0,
+   "exactitud": 0.9925,
+   "precision": 0.9952,
    "recall": 0.9904,
-   "f1": 0.9952
+   "f1": 0.9928
   },
-  "todas_correctas": 0.8363
+  "todas_correctas": 0.8163
  },
  "test_umbral_simple": {
   "ruido": {
-   "exactitud": 0.8075,
-   "precision": 0.9,
-   "recall": 0.6853,
-   "f1": 0.7781
+   "exactitud": 0.84,
+   "precision": 0.841,
+   "recall": 0.8325,
+   "f1": 0.8367
   },
   "desenfoque": {
-   "exactitud": 0.7738,
-   "precision": 0.9721,
-   "recall": 0.5443,
-   "f1": 0.6978
+   "exactitud": 0.8387,
+   "precision": 0.9381,
+   "recall": 0.7109,
+   "f1": 0.8089
   },
   "compresion": {
-   "exactitud": 0.9313,
-   "precision": 0.9229,
-   "recall": 0.9472,
-   "f1": 0.9349
+   "exactitud": 0.9375,
+   "precision": 0.9238,
+   "recall": 0.9592,
+   "f1": 0.9412
   },
-  "todas_correctas": 0.5925
+  "todas_correctas": 0.64
  },
  "umbrales_simples": [
   {
    "etiqueta": "ruido",
-   "caracteristica": "densidad_bordes_canny",
-   "umbral": 0.2498,
+   "caracteristica": "ruido_zonas_planas",
+   "umbral": 2.1045,
    "sentido": 1
   },
   {
    "etiqueta": "desenfoque",
-   "caracteristica": "alta_frec_relativa",
-   "umbral": 0.1764,
+   "caracteristica": "nitidez_log_var_laplaciano",
+   "umbral": 2.3117,
    "sentido": -1
   },
   {
    "etiqueta": "compresion",
    "caracteristica": "bloques_jpeg",
-   "umbral": 1.1955,
+   "umbral": 1.2216,
    "sentido": 1
   }
  ]

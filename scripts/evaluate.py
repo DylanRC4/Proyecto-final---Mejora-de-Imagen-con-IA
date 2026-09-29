@@ -2,11 +2,12 @@
 
 Compara, con el mismo ruido (semilla por imagen y condición):
   sin filtro | mediana (mejor en validación) | gaussiano (mejor en validación) | CNN
-Condiciones: gaussiano sigma 15, 25, 50 (la CNN se entrenó con sigma en [5, 50]) y sal y pimienta 5 %
-(la CNN NO se entrenó con este ruido: se incluye para mostrar honestamente sus límites).
+Condiciones: gaussiano sigma 15, 25, 50, sal y pimienta 5 % (ninguna CNN se entrenó con este ruido: muestra
+honestamente sus límites) y ruido de CÁMARA (noise.add_camera_noise, a = 0.003), el que se parece al del celular.
+Para el ruido de cámara los filtros clásicos usan los parámetros elegidos en validación para gaussiano sigma 15.
 
-Uso:  python scripts/evaluate.py [--model models/denoise_cnn.pt] [--limit N]
-Salidas: results/test_metrics.csv (por imagen), results/test_summary.json y .md, results/examples/*.png
+Uso:  python scripts/evaluate.py [--model models/denoise_cnn_v2.pt] [--limit N]
+Salidas: results/noise_eval/<modelo>.md/.json/.csv y results/noise_eval/examples_<modelo>/*.png
 """
 import argparse
 import csv
@@ -21,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from imageenhance import classic, data, metrics, model as M, noise  # noqa: E402
 from imageenhance.io_utils import bgr_to_rgb  # noqa: E402
 
-CONDITIONS = [("gaussian", 15), ("gaussian", 25), ("gaussian", 50), ("salt_pepper", 0.05)]
+CONDITIONS = [("gaussian", 15), ("gaussian", 25), ("gaussian", 50), ("salt_pepper", 0.05), ("camara", 0.003)]
 METHODS = ["sin_filtro", "mediana", "gaussiano", "cnn"]
 EXAMPLES = 3
 
@@ -51,11 +52,14 @@ def main() -> None:
     net, meta = M.load(root / args.model)
     best = json.loads((root / "results" / "classic_params.json").read_text("utf-8"))["best"]
     imgs = data.load_split("test", args.limit)
-    ex_dir = root / "results" / "examples"
+    tag = Path(args.model).stem
+    out = root / "results" / "noise_eval"
+    ex_dir = out / f"examples_{tag}"
     ex_dir.mkdir(parents=True, exist_ok=True)
     rows, summary, t0 = [], {}, time.time()
     for kind, level in CONDITIONS:
-        med_p, gau_p = best[f"{kind}_{level}_median"], best[f"{kind}_{level}_gaussian"]
+        med_p = best.get(f"{kind}_{level}_median", best["gaussian_15_median"])
+        gau_p = best.get(f"{kind}_{level}_gaussian", best["gaussian_15_gaussian"])
         for idx, (name, clean) in enumerate(imgs):
             noisy = noise.degrade(clean, kind, level, data.noise_seed(name, kind, level))
             outs = {"sin_filtro": noisy, "mediana": classic.median_filter(noisy, **med_p),
@@ -75,21 +79,20 @@ def main() -> None:
         print(f"{kind:11s} {level:<5}" + "".join(f" | {m} {res[m]['psnr']:.2f}/{res[m]['ssim']:.3f}" for m in METHODS)
               + f" | CNN>gauss en {res['cnn_gana_a_gaussiano_en']}", flush=True)
 
-    out = root / "results"
-    with open(out / "test_metrics.csv", "w", newline="", encoding="utf-8") as f:
+    with open(out / f"{tag}.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=rows[0].keys(), lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
     info = {"model": args.model, "model_epoch": meta.get("epoch"), "test_images": len(imgs),
             "classic_params": best, "seconds": round(time.time() - t0, 1), "results": summary}
-    (out / "test_summary.json").write_text(json.dumps(info, indent=1), "utf-8")
+    (out / f"{tag}.json").write_text(json.dumps(info, indent=1), "utf-8")
     lines = ["| Ruido | Sin filtro | Mediana | Gaussiano | CNN (nuestra) | CNN > gaussiano |", "|---|---|---|---|---|---|"]
     for cond, res in summary.items():
         lines.append(f"| {cond} | " + " | ".join(f"{res[m]['psnr']:.2f} dB / {res[m]['ssim']:.3f}" for m in METHODS)
                      + f" | {res['cnn_gana_a_gaussiano_en']} |")
-    (out / "test_summary.md").write_text(
-        f"Conjunto de prueba BSDS500: {len(imgs)} fotos. Valores: PSNR medio / SSIM medio.\n\n" + "\n".join(lines) + "\n", "utf-8")
-    print(f"{len(imgs)} fotos de prueba en {time.time() - t0:.0f} s -> results/test_summary.md")
+    (out / f"{tag}.md").write_text(
+        f"{args.model} en el conjunto de prueba BSDS500: {len(imgs)} fotos. Valores: PSNR medio / SSIM medio.\n\n" + "\n".join(lines) + "\n", "utf-8")
+    print(f"{len(imgs)} fotos de prueba en {time.time() - t0:.0f} s -> results/noise_eval/{tag}.md")
 
 
 if __name__ == "__main__":

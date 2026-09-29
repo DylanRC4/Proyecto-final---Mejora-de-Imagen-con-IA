@@ -27,6 +27,16 @@ class DenoiseCNN(nn.Module):
             layers += [conv(features, features), nn.ReLU(inplace=True)]
         layers.append(conv(features, channels))
         self.noise_net = nn.Sequential(*layers)
+        # Inicialización He (He et al., 2015): conserva la varianza de la señal capa a capa con ReLU. Con la
+        # inicialización por defecto, la v3 (16 capas) "murió": 92 % de neuronas apagadas en la capa 3 y la red
+        # se quedó 3 épocas sin aprender. La última capa arranca en cero: la red empieza como identidad y
+        # antes de entrenar no daña la foto. (Solo afecta a redes nuevas; al cargar un modelo se usan sus pesos.)
+        convs = [m for m in layers if isinstance(m, nn.Conv2d)]
+        for m in convs[:-1]:
+            nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
+            nn.init.zeros_(m.bias)
+        nn.init.zeros_(convs[-1].weight)
+        nn.init.zeros_(convs[-1].bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x - self.noise_net(x)

@@ -28,8 +28,8 @@ st.set_page_config(page_title="ImageEnhance AI", layout="wide")
 def load_models():
     from imageenhance import external, model
     m = {"denoiser": None, "detail": None, "diagnoser": None, "esrgan": None, "meta": {}}
-    if (ROOT / "models" / "denoise_cnn.pt").exists():
-        m["denoiser"], m["meta"] = model.load(ROOT / "models" / "denoise_cnn.pt")
+    if (ROOT / "models" / pipeline.NOISE_MODEL).exists():
+        m["denoiser"], m["meta"] = model.load(ROOT / "models" / pipeline.NOISE_MODEL)
     if (ROOT / "models" / pipeline.DETAIL_MODEL).exists():
         m["detail"] = model.load(ROOT / "models" / pipeline.DETAIL_MODEL)[0]
     if (ROOT / "models" / "diagnosis_mlp.pt").exists():
@@ -58,6 +58,20 @@ def before_after(a, b, cap_a="Original", cap_b="Mejorada"):
     c1, c2 = st.columns(2)
     c1.image(rgb(a), caption=f"{cap_a} — {a.shape[1]}×{a.shape[0]} px", width="stretch")
     c2.image(rgb(b), caption=f"{cap_b} — {b.shape[1]}×{b.shape[0]} px", width="stretch")
+    if a.shape == b.shape and np.any(a != b):
+        zoom(a, b)
+
+
+def zoom(a, b, side=200):
+    """Lupa: la zona donde MÁS cambió la foto, ampliada ×3 sin suavizar (píxeles reales). A pantalla
+    completa la foto se ve reducida y un cambio de 1-2 px (grano, bordes) no se nota."""
+    s = min(side, *a.shape[:2])
+    y, x = np.unravel_index(np.argmax(cv2.boxFilter(np.abs(b - a).mean(axis=2), -1, (s, s))), a.shape[:2])
+    y, x = min(max(y - s // 2, 0), a.shape[0] - s), min(max(x - s // 2, 0), a.shape[1] - s)
+    big = lambda im: cv2.resize(rgb(im[y:y + s, x:x + s]), (3 * s, 3 * s), interpolation=cv2.INTER_NEAREST)
+    c1, c2 = st.columns(2)
+    c1.image(big(a), caption=f"Lupa ×3 — antes (zona x={x}, y={y})", width="stretch")
+    c2.image(big(b), caption="Lupa ×3 — después: la zona donde más cambió la foto", width="stretch")
 
 
 def reference_metrics(ref, before, after):
@@ -145,6 +159,11 @@ with tab_auto:
                                                  ("oscura", "sobreexpuesta", "poco_contraste", "dominante_color")]},
                                   index=["oscura", "sobreexpuesta", "poco contraste", "dominante de color"]), width="stretch")
         plan = pipeline.plan(probs)
+        if probs["dominante_color"]:  # el color no se corrige solo (ver pipeline.plan): decide quien conoce la escena
+            st.info(f"Posible dominante de color (bordes {f['dominante_bordes']:.2f} > {diagnosis.COLOR_UMBRAL}). No se corrige "
+                    "sola: puede ser la luz de la escena (atardecer, faroles) o un defecto (bombillo amarillo, fluorescente).")
+            if st.checkbox("Es un defecto: neutralizar el color (balance de blancos gray-edge)", key="neutral"):
+                plan.append("color")
         st.subheader("2. Tratamiento decidido por el sistema")
         if not plan:
             st.success("El diagnóstico no encontró problemas claros: la foto se deja como está. "

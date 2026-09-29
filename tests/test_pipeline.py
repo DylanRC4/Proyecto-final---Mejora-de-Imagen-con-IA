@@ -19,7 +19,7 @@ def models():
 def test_plan_respeta_el_orden():
     assert P.plan(SANA) == []
     todo = dict.fromkeys(SANA, True)
-    assert P.plan(todo) == ["ruido", "detalle", "contraste", "luz", "color"]
+    assert P.plan(todo) == ["ruido", "detalle", "contraste", "luz"]  # el color solo se avisa, no se corrige solo
     assert P.plan({**SANA, "compresion": True, "oscura": True}) == ["detalle", "contraste", "luz"]
 
 

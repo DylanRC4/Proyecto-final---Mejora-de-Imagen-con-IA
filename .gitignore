@@ -36,3 +36,9 @@ desktop.ini
 
 # Modelos externos preentrenados (se descargan con scripts/download_models.py)
 models/external/
+
+# Archivos que el asistente deja en la carpeta (análisis con fotos personales: nunca se suben)
+Claude outputs/
+
+# Ejemplos pesados de la evaluación de ruido (38 MB; se regeneran con scripts/evaluate.py)
+results/noise_eval/examples_*/

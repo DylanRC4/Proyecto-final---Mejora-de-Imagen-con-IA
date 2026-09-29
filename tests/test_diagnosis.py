@@ -35,6 +35,11 @@ def test_reglas_de_tono(foto):
     assert not D.tone_flags(D.features(foto))["oscura"]
 
 
-def test_mlp_tiene_931_parametros():
+def test_mlp_tiene_963_parametros():
     pytest.importorskip("torch")
-    assert sum(p.numel() for p in D.build_mlp().parameters()) == 931
+    assert sum(p.numel() for p in D.build_mlp().parameters()) == 963
+
+
+def test_ruido_de_camara_se_ve_en_zonas_planas(foto):
+    liso = np.full((256, 256, 3), 0.4, np.float32)
+    assert D.features(noise.add_camera_noise(liso, np.random.default_rng(0), 3e-3))[10] > D.features(liso)[10] + 2

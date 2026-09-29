@@ -1,6 +1,6 @@
 """Diagnóstico automático: ¿qué le pasa a esta foto?
 
-1. Se extraen 10 características numéricas de la imagen (Sesión 06: de píxeles a una tabla).
+1. Se extraen 11 características numéricas de la imagen (Sesión 06: de píxeles a una tabla).
 2. Ruido, desenfoque y compresión JPEG los decide un clasificador MLP entrenado por nosotros
    (Sesión 12), porque ahí las medidas se confunden entre sí: la textura parece ruido, el
    desenfoque esconde el ruido, la compresión borra detalle...
@@ -10,18 +10,19 @@
 import cv2
 import numpy as np
 
-from .analysis import estimate_noise_sigma
+from .analysis import estimate_flat_noise, estimate_noise_sigma
 from .enhance import gray_edge
 from .io_utils import resize_max, to_gray
 
 FEATURES = ["ruido_sigma", "nitidez_log_var_laplaciano", "alta_frec_relativa", "densidad_bordes_canny",
             "bloques_jpeg", "brillo", "contraste", "percentil_1", "percentil_99",
-            "dominante_bordes"]
+            "dominante_bordes", "ruido_zonas_planas"]
 LABELS = ["ruido", "desenfoque", "compresion"]
 CROP = 768  # recorte central para las medidas de detalle (BSDS500 mide 481 px: cabe completa)
 # Umbral de dominante de color elegido en VALIDACIÓN (100 fotos limpias + 100 con dominante aleatoria del
 # 10-25 %): el menor con falsas alarmas <= 5 %. Con 0.18: 5 % de falsas alarmas y detecta el 87 %.
 # La regla anterior (mundo gris) tenía 15 % de falsas alarmas y detectaba solo el 40 %.
+# OJO: en fotos modernas (DIV2K val) este umbral da 33 % de falsas alarmas: por eso el color solo se avisa.
 COLOR_UMBRAL = 0.18
 # Tono: se juzga el RANGO del histograma, no el brillo medio. Subexponer escala toda la foto hacia abajo, así
 # que su percentil 99 no llega al blanco; una escena nocturna bien expuesta sí tiene luces que llegan. Umbrales
@@ -40,7 +41,7 @@ def blockiness(gray: np.ndarray) -> float:
 
 
 def features(img: np.ndarray) -> np.ndarray:
-    """Vector de 10 características de una imagen BGR float [0, 1] a la resolución en que se va a procesar.
+    """Vector de 11 características de una imagen BGR float [0, 1] a la resolución en que se va a procesar.
 
     Ruido, nitidez, bordes y bloques JPEG se miden en un recorte central SIN reducir la foto:
     reducirla promedia píxeles vecinos y borra justo el ruido y los bloques que buscamos.
@@ -59,7 +60,7 @@ def features(img: np.ndarray) -> np.ndarray:
     p1, p99 = np.percentile(gs, [1, 99])
     return np.array([estimate_noise_sigma(crop), np.log10(lap.var() + 1), np.abs(lap).mean() / (grad.mean() + 1e-6),
                      (edges > 0).mean(), blockiness(g), gs.mean(), gs.std(), p1, p99,
-                     np.ptp(edges_bgr) / (edges_bgr.mean() + 1e-6)], dtype=np.float32)
+                     np.ptp(edges_bgr) / (edges_bgr.mean() + 1e-6), estimate_flat_noise(crop)], dtype=np.float32)
 
 
 def tone_flags(f: np.ndarray) -> dict:
@@ -70,7 +71,7 @@ def tone_flags(f: np.ndarray) -> dict:
 
 
 def build_mlp(n_in: int = len(FEATURES), n_out: int = len(LABELS)):
-    """10 → 32 → 16 → 3. Parámetros: (10+1)·32 + (32+1)·16 + (16+1)·3 = 931 (fórmula de la Sesión 12)."""
+    """11 → 32 → 16 → 3. Parámetros: (11+1)·32 + (32+1)·16 + (16+1)·3 = 963 (fórmula de la Sesión 12)."""
     from torch import nn
     return nn.Sequential(nn.Linear(n_in, 32), nn.ReLU(), nn.Linear(32, 16), nn.ReLU(), nn.Linear(16, n_out))
 
