@@ -30,9 +30,11 @@ def test_reglas_de_tono(foto):
     assert D.tone_flags(D.features(foto * 0.3))["oscura"]
     assert D.tone_flags(D.features(0.45 + 0.1 * foto))["poco_contraste"]
     assert D.tone_flags(D.features(np.clip(foto * np.array([0.6, 1.0, 1.5], np.float32), 0, 1)))["dominante_color"]
+    gris = foto[..., :1].repeat(3, axis=-1)
+    assert not D.tone_flags(D.features(gris))["dominante_color"]  # bordes neutros: sin dominante
     assert not D.tone_flags(D.features(foto))["oscura"]
 
 
-def test_mlp_tiene_963_parametros():
-    torch = pytest.importorskip("torch")
-    assert sum(p.numel() for p in D.build_mlp().parameters()) == 963
+def test_mlp_tiene_931_parametros():
+    pytest.importorskip("torch")
+    assert sum(p.numel() for p in D.build_mlp().parameters()) == 931

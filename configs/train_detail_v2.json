@@ -1,0 +1,15 @@
+{
+ "task": "detail",
+ "detail_mix": "v2",
+ "dataset": "div2k",
+ "seed": 2026,
+ "features": 48,
+ "depth": 12,
+ "patch": 64,
+ "patches_per_image": 10,
+ "batch": 32,
+ "epochs": 30,
+ "lr": 0.001,
+ "lr_min": 0.00001,
+ "val_crop": 256
+}

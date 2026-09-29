@@ -1,6 +1,6 @@
 import numpy as np
 
-from imageenhance import enhance
+from imageenhance import enhance, metrics
 from imageenhance.io_utils import to_gray
 
 
@@ -27,11 +27,11 @@ def test_clahe_aumenta_contraste_y_conserva_forma():
     assert to_gray(out).std() > 1.2 * to_gray(apagada).std()
 
 
-def test_balance_de_blancos_quita_dominante_de_color(img):
+def test_balance_de_blancos_gray_edge_quita_la_dominante(img):
     amarilla = np.clip(img * np.array([0.8, 1.0, 1.2], np.float32), 0, 1)  # BGR: menos azul, más rojo
     out, gains = enhance.white_balance(amarilla)
-    m = out.reshape(-1, 3).mean(axis=0)
-    assert gains[0] > 1 > gains[2] and m.max() - m.min() < 0.3 * (np.ptp(amarilla.reshape(-1, 3).mean(0)))
+    assert gains[0] > 1 > gains[2]
+    assert metrics.psnr(img, out) > metrics.psnr(img, amarilla) + 3
 
 
 def test_nitidez_no_cambia_zonas_planas_y_aumenta_bordes():

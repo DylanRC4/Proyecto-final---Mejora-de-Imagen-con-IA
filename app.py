@@ -12,23 +12,26 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from imageenhance import analysis, classic, enhance, metrics, noise, pipeline
+from imageenhance import analysis, classic, diagnosis, enhance, metrics, noise, pipeline
 from imageenhance.io_utils import bgr_to_rgb, decode_bytes, resize_max, to_float, to_uint8
 
 ROOT = Path(__file__).resolve().parent
 EXAMPLE_DIRS = {"demo": ROOT / "data" / "demo", "bsds": ROOT / "data" / "raw" / "bsds500" / "test"}
 NOMBRES = {"ruido": "Ruido", "detalle": "Detalle (desenfoque / compresión)", "luz": "Iluminación",
-           "contraste": "Contraste", "color": "Color", "nitidez": "Nitidez extra", "ampliar": "Ampliar resolución"}
+           "contraste": "Contraste", "color": "Color", "nitidez": "Nitidez extra", "ampliar": "Ampliar ×2",
+           "detalle_externo": "Detalle con Real-ESRGAN (externo)", "ampliar_externo": "Ampliar con Real-ESRGAN (externo)"}
 
 st.set_page_config(page_title="ImageEnhance AI", layout="wide")
 
 
 @st.cache_resource(show_spinner="Cargando modelos…")
 def load_models():
-    from imageenhance import diagnosis, external, model
-    m = {"denoiser": None, "diagnoser": None, "esrgan": None, "meta": {}}
+    from imageenhance import external, model
+    m = {"denoiser": None, "detail": None, "diagnoser": None, "esrgan": None, "meta": {}}
     if (ROOT / "models" / "denoise_cnn.pt").exists():
         m["denoiser"], m["meta"] = model.load(ROOT / "models" / "denoise_cnn.pt")
+    if (ROOT / "models" / pipeline.DETAIL_MODEL).exists():
+        m["detail"] = model.load(ROOT / "models" / pipeline.DETAIL_MODEL)[0]
     if (ROOT / "models" / "diagnosis_mlp.pt").exists():
         m["diagnoser"] = diagnosis.Diagnoser(ROOT / "models" / "diagnosis_mlp.pt")
     if external.ESRGAN_PATH.exists():
@@ -105,11 +108,11 @@ if experiment:
     seed = int(st.sidebar.number_input("Semilla", 0, 10_000, 42))
 
 st.sidebar.markdown("**Modelos**")
-for label, key, origin in [("CNN de ruido", "denoiser", "nuestra"), ("MLP de diagnóstico", "diagnoser", "nuestra"),
-                           ("Real-ESRGAN", "esrgan", "externo")]:
+for label, key, origin in [("CNN de ruido", "denoiser", "nuestra"), ("CNN de detalle", "detail", "nuestra"),
+                           ("MLP de diagnóstico", "diagnoser", "nuestra"), ("Real-ESRGAN", "esrgan", "externo")]:
     st.sidebar.caption(f"{'✅' if models[key] is not None else '❌'} {label} ({origin})")
 if models["esrgan"] is None:
-    st.sidebar.caption("Para activar Real-ESRGAN: `python scripts/download_models.py`")
+    st.sidebar.caption("Real-ESRGAN es opcional (solo herramientas manuales): `python scripts/download_models.py`")
 
 original = prepare(raw, max_side)
 reference, work = (original, noise.degrade(original, kind, level, seed)) if experiment else (None, original)
@@ -134,28 +137,26 @@ with tab_auto:
                                    "detectado": ["sí" if probs[k] else "no" for k in prob]}, index=list(prob)), width="stretch")
         c2.markdown("**Reglas sobre el histograma (clásico)**")
         f = diag["features"]
-        c2.dataframe(pd.DataFrame({"medida": [f"brillo {f['brillo']:.2f}", f"brillo {f['brillo']:.2f}",
+        c2.dataframe(pd.DataFrame({"medida": [f"p99 {f['percentil_99']:.2f} (mín. {diagnosis.P99_MIN})",
+                                              f"p1 {f['percentil_1']:.2f} (máx. {diagnosis.P1_MAX})",
                                               f"rango {f['percentil_99'] - f['percentil_1']:.2f}",
-                                              f"{f['dominante_media']:.2f} / {f['dominante_brillantes']:.2f}"],
+                                              f"bordes {f['dominante_bordes']:.2f} (umbral {diagnosis.COLOR_UMBRAL})"],
                                    "detectado": ["sí" if probs[k] else "no" for k in
                                                  ("oscura", "sobreexpuesta", "poco_contraste", "dominante_color")]},
                                   index=["oscura", "sobreexpuesta", "poco contraste", "dominante de color"]), width="stretch")
         plan = pipeline.plan(probs)
-        st.subheader("2. Tratamiento")
-        steps = st.multiselect("Pasos a aplicar (propuestos por el diagnóstico; puedes cambiarlos)", pipeline.ORDEN,
-                               default=plan, format_func=NOMBRES.get, key=f"pasos_{img_key}")
-        factor = st.radio("Ampliación", [2, 4], horizontal=True, format_func=lambda x: f"×{x}", key="factor_auto") \
-            if "ampliar" in steps else 2
-        strength = st.slider("Intensidad de Real-ESRGAN en el paso de detalle", 0.0, 1.0, 0.7, 0.1, key="fuerza_auto",
-                             help="1 = modelo puro (muy nítido, a veces aspecto 'pintado'); menos = mezcla con la original.") \
-            if "detalle" in steps else 0.7
+        st.subheader("2. Tratamiento decidido por el sistema")
         if not plan:
-            st.success("El diagnóstico no encontró problemas claros. Puedes elegir pasos manualmente.")
-        if st.button("Mejorar automáticamente", type="primary", key="auto_btn", disabled=not steps):
-            st.session_state["auto"] = (img_key, tuple(steps), factor, strength)
-        if st.session_state.get("auto") and st.session_state["auto"][0] == img_key:
-            _, s, fac, fuerza = st.session_state["auto"]
-            out, log = run_steps(work, s, fac, 0.6, fuerza)
+            st.success("El diagnóstico no encontró problemas claros: la foto se deja como está. "
+                       "Si quieres otro ajuste, usa la pestaña Herramientas.")
+        else:
+            st.markdown(" → ".join(f"**{NOMBRES[p]}**" for p in plan))
+            st.caption("Sin parámetros: el diagnóstico decide los pasos y cada paso mide la foto para decidir cuánto corregir. "
+                       "Solo se usan nuestras redes y métodos clásicos (nada generativo).")
+        if plan and st.button("Mejorar automáticamente", type="primary", key="auto_btn"):
+            st.session_state["auto"] = img_key
+        if plan and st.session_state.get("auto") == img_key:
+            out, log = run_steps(work, tuple(plan))
             st.subheader("3. Resultado")
             before_after(work, out)
             st.dataframe(pd.DataFrame(log).set_index("paso").rename(index=NOMBRES), width="stretch")
@@ -164,17 +165,21 @@ with tab_auto:
 
 # ---------------- 2. Herramientas individuales ----------------
 with tab_tools:
-    st.caption("Activa las herramientas que quieras. Se aplican en el orden correcto: ruido → detalle → luz → contraste → color → nitidez → ampliar.")
+    st.caption("Activa las herramientas que quieras. Se aplican en el orden correcto: ruido → detalle → contraste → luz → color → nitidez → ampliar.")
     c1, c2, c3 = st.columns(3)
     t_noise = c1.selectbox("Reducir ruido", ["No", "Nuestra CNN", "Mediana", "Gaussiano"], key="t_ruido")
-    t_detail = c1.slider("Restaurar detalle (Real-ESRGAN, externo): intensidad", 0.0, 1.0, 0.0, 0.1,
-                         disabled=models["esrgan"] is None, key="t_detalle")
+    t_detail = c1.selectbox("Restaurar detalle", ["No", "Nuestra CNN de detalle", "Real-ESRGAN (externo, generativo)"],
+                            key="t_detalle")
+    t_force = c1.slider("Intensidad de Real-ESRGAN", 0.0, 1.0, 0.7, 0.1, key="t_fuerza",
+                        help="1 = modelo puro (a veces aspecto 'pintado'); menos = mezcla con la original.") \
+        if t_detail.startswith("Real") else 0.7
     t_light = c2.selectbox("Iluminación", ["No", "Automática (gamma)", "Manual"], key="t_luz")
     gamma = c2.slider("γ (menor que 1 aclara)", 0.3, 3.0, 1.0, 0.05, key="t_gamma") if t_light == "Manual" else None
     t_contrast = c2.selectbox("Contraste", ["No", "Niveles automáticos", "CLAHE (por zonas)"], key="t_contraste")
     t_color = c3.slider("Balance de blancos (intensidad)", 0.0, 1.0, 0.0, 0.1, key="t_color")
     t_sharp = c3.slider("Nitidez (máscara de desenfoque)", 0.0, 2.0, 0.0, 0.1, key="t_nitidez")
-    t_up = c3.selectbox("Ampliar resolución (Real-ESRGAN)", ["No", "×2", "×4"], disabled=models["esrgan"] is None, key="t_ampliar")
+    t_up = c3.selectbox("Ampliar resolución", ["No", "×2 — nuestra CNN", "×2 — Real-ESRGAN (externo)", "×4 — Real-ESRGAN (externo)"],
+                        key="t_ampliar")
     out, log = work, []
     if t_noise == "Nuestra CNN" and models["denoiser"] is not None:
         out, lg = run_steps(out, ("ruido",), 2, 0.6); log += lg
@@ -182,22 +187,23 @@ with tab_tools:
         out = classic.median_filter(out, 3); log.append({"paso": "ruido", "origen": "Clásico: mediana 3×3"})
     elif t_noise == "Gaussiano":
         out = classic.gaussian_filter(out, 7, 0.8); log.append({"paso": "ruido", "origen": "Clásico: gaussiano 7×7, σ=0.8"})
-    if t_detail > 0:
-        out, lg = run_steps(out, ("detalle",), 2, 0.6, t_detail); log += lg
-    if t_light == "Automática (gamma)":
-        out, g = enhance.auto_gamma(out); log.append({"paso": "luz", "origen": f"Clásico: gamma automática γ={g:.2f}"})
-    elif t_light == "Manual":
-        out = np.power(out, gamma, dtype=np.float32); log.append({"paso": "luz", "origen": f"Clásico: gamma manual γ={gamma}"})
+    if t_detail != "No":
+        out, lg = run_steps(out, ("detalle" if t_detail.startswith("Nuestra") else "detalle_externo",), 2, 0.6, t_force)
+        log += lg
     if t_contrast == "Niveles automáticos":
         out = enhance.auto_levels(out)[0]; log.append({"paso": "contraste", "origen": "Clásico: niveles automáticos"})
     elif t_contrast.startswith("CLAHE"):
         out = enhance.clahe(out); log.append({"paso": "contraste", "origen": "Clásico: CLAHE"})
+    if t_light == "Automática (gamma)":
+        out, g = enhance.auto_gamma(out); log.append({"paso": "luz", "origen": f"Clásico: gamma automática γ={g:.2f}"})
+    elif t_light == "Manual":
+        out = np.power(out, gamma, dtype=np.float32); log.append({"paso": "luz", "origen": f"Clásico: gamma manual γ={gamma}"})
     if t_color > 0:
-        out = enhance.white_balance(out, t_color)[0]; log.append({"paso": "color", "origen": f"Clásico: balance de blancos {t_color}"})
+        out = enhance.white_balance(out, t_color)[0]; log.append({"paso": "color", "origen": f"Clásico: balance de blancos gray-edge {t_color}"})
     if t_sharp > 0:
         out = enhance.unsharp(out, t_sharp); log.append({"paso": "nitidez", "origen": f"Clásico: máscara de desenfoque {t_sharp}"})
     if t_up != "No":
-        out, lg = run_steps(out, ("ampliar",), int(t_up[1]), 0.6); log += lg
+        out, lg = run_steps(out, ("ampliar_externo" if "Real" in t_up else "ampliar",), int(t_up[1]), 0.6); log += lg
     before_after(work, out, cap_b="Resultado")
     if log:
         st.dataframe(pd.DataFrame(log).set_index("paso").rename(index=NOMBRES), width="stretch")

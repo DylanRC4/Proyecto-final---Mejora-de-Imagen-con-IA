@@ -20,3 +20,11 @@ def test_parches_forma_y_reproducibles(img):
     a = data.random_patches(img, 5, 32, np.random.default_rng(0))
     b = data.random_patches(img, 5, 32, np.random.default_rng(0))
     assert a.shape == (5, 32, 32, 3) and np.array_equal(a, b)
+
+
+def test_div2k_split_por_foto_y_aviso_si_falta():
+    from scripts.prepare_div2k import split_of
+    assert [split_of(i) for i in (1, 700, 701, 800, 801, 900)] == ["train", "train", "val", "val", "test", "test"]
+    if not data.DATASETS["div2k"][1].exists():
+        with pytest.raises(FileNotFoundError, match="prepare_div2k"):
+            data.split_names("train", "div2k")

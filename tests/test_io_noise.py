@@ -59,3 +59,18 @@ def test_degradaciones_de_detalle(img):
     # reducir y ampliar pierde detalle fino: la imagen cambia, pero su brillo medio casi no
     d = noise.add_downscale(img, 3.0)
     assert np.abs(d - img).mean() > 1e-3 and abs(d.mean() - img.mean()) < 0.01
+
+
+def test_mezcla_de_detalle_v2_equilibrada(img):
+    rng = np.random.default_rng(0)
+    iguales = sum(np.array_equal(noise.random_detail_v2(img, rng), img) for _ in range(200))
+    assert 10 <= iguales <= 35  # ~10 % de fotos limpias: la red aprende a no tocarlas
+    assert all(f(img).shape == img.shape for f in noise.VAL_DETAIL)
+
+
+def test_exposicion_fisica_y_dominante(img):
+    assert np.allclose(noise.add_exposure(img, 0), img, atol=1e-5)
+    osc, quem = noise.add_exposure(img, -2), noise.add_exposure(img, 2)
+    assert osc.mean() < 0.6 * img.mean() and quem.max() > 0.999 and quem.mean() > img.mean()
+    cast = noise.add_cast(img).reshape(-1, 3).mean(0)
+    assert cast[0] < img.reshape(-1, 3).mean(0)[0] and cast[2] > img.reshape(-1, 3).mean(0)[2] * 1.05

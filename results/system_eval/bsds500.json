@@ -1,0 +1,166 @@
+{
+ "dataset": "bsds500",
+ "detail_model": "models/detail_cnn_v2.pt",
+ "test_images": 200,
+ "clasico_ruido": {
+  "ksize": 7,
+  "sigma": 0.8
+ },
+ "seconds": 424.3,
+ "results": {
+  "limpia": {
+   "sin_procesar": {
+    "psnr": 60.0,
+    "ssim": 1.0
+   },
+   "sistema": {
+    "psnr": 55.22903549999999,
+    "ssim": 0.984643
+   },
+   "sistema_clasico": {
+    "psnr": 55.1824085,
+    "ssim": 0.984488
+   },
+   "mejora": "0/200",
+   "empeora": "28/200",
+   "planes_mas_comunes": {
+    "(nada)": 172,
+    "color": 14,
+    "ruido": 7
+   },
+   "segundos_por_foto": 0.029
+  },
+  "ruido": {
+   "sin_procesar": {
+    "psnr": 24.828775500000003,
+    "ssim": 0.5626209999999999
+   },
+   "sistema": {
+    "psnr": 30.416504,
+    "ssim": 0.8672270000000001
+   },
+   "sistema_clasico": {
+    "psnr": 27.410034999999997,
+    "ssim": 0.7739159999999999
+   },
+   "mejora": "195/200",
+   "empeora": "5/200",
+   "planes_mas_comunes": {
+    "ruido": 172,
+    "ruido → detalle": 13,
+    "ruido → color": 10
+   },
+   "segundos_por_foto": 0.129
+  },
+  "oscura_ruidosa": {
+   "sin_procesar": {
+    "psnr": 12.967975,
+    "ssim": 0.47252599999999995
+   },
+   "sistema": {
+    "psnr": 21.3920125,
+    "ssim": 0.7312415
+   },
+   "sistema_clasico": {
+    "psnr": 21.294428000000003,
+    "ssim": 0.6520914999999999
+   },
+   "mejora": "192/200",
+   "empeora": "8/200",
+   "planes_mas_comunes": {
+    "ruido → contraste → luz": 157,
+    "ruido → detalle → contraste → luz": 20,
+    "ruido → contraste → luz → color": 15
+   },
+   "segundos_por_foto": 0.17
+  },
+  "desenfoque_jpeg": {
+   "sin_procesar": {
+    "psnr": 26.098765000000004,
+    "ssim": 0.7447155000000001
+   },
+   "sistema": {
+    "psnr": 25.828106,
+    "ssim": 0.761621
+   },
+   "sistema_clasico": {
+    "psnr": 25.4036015,
+    "ssim": 0.7440485000000001
+   },
+   "mejora": "177/200",
+   "empeora": "22/200",
+   "planes_mas_comunes": {
+    "detalle": 170,
+    "detalle → contraste → luz": 14,
+    "detalle → color": 12
+   },
+   "segundos_por_foto": 0.308
+  },
+  "oscura_velo": {
+   "sin_procesar": {
+    "psnr": 14.3021725,
+    "ssim": 0.7869869999999999
+   },
+   "sistema": {
+    "psnr": 24.004409999999996,
+    "ssim": 0.8902615
+   },
+   "sistema_clasico": {
+    "psnr": 24.001754499999997,
+    "ssim": 0.890283
+   },
+   "mejora": "182/200",
+   "empeora": "16/200",
+   "planes_mas_comunes": {
+    "contraste → luz": 180,
+    "contraste → luz → color": 19,
+    "detalle → contraste → luz → color": 1
+   },
+   "segundos_por_foto": 0.05
+  },
+  "dominante": {
+   "sin_procesar": {
+    "psnr": 24.4612035,
+    "ssim": 0.9784694999999999
+   },
+   "sistema": {
+    "psnr": 31.846404000000003,
+    "ssim": 0.9822719999999999
+   },
+   "sistema_clasico": {
+    "psnr": 31.8922215,
+    "ssim": 0.9827279999999999
+   },
+   "mejora": "186/200",
+   "empeora": "8/200",
+   "planes_mas_comunes": {
+    "color": 177,
+    "detalle → color": 10,
+    "contraste → luz → color": 5
+   },
+   "segundos_por_foto": 0.071
+  },
+  "todo": {
+   "sin_procesar": {
+    "psnr": 14.6286445,
+    "ssim": 0.5692175
+   },
+   "sistema": {
+    "psnr": 18.389726999999997,
+    "ssim": 0.5920795000000001
+   },
+   "sistema_clasico": {
+    "psnr": 18.3177745,
+    "ssim": 0.529687
+   },
+   "mejora": "130/200",
+   "empeora": "14/200",
+   "planes_mas_comunes": {
+    "detalle → contraste → luz": 127,
+    "detalle": 65,
+    "detalle → contraste → luz → color": 6
+   },
+   "segundos_por_foto": 0.321
+  }
+ }
+}

@@ -8,8 +8,8 @@ Condiciones (todas deterministas):
   baja_res   reducción ×2 y ampliación bicúbica
 La intensidad de la nitidez clásica se elige en VALIDACIÓN (30 fotos), como se hizo con los filtros de ruido.
 
-Uso:  python scripts/evaluate_detail.py [--limit N]
-Salidas: results/detail_test_summary.md y .json, results/detail_test_metrics.csv, results/examples_detail/*.jpg
+Uso:  python scripts/evaluate_detail.py [--model models/detail_cnn_v2.pt] [--dataset bsds500|div2k] [--limit N]
+Salidas: results/detail_eval/<modelo>_<dataset>.md/.json/.csv y results/detail_eval/examples_<modelo>_<dataset>/
 """
 import argparse
 import csv
@@ -56,12 +56,16 @@ def main() -> None:
     ap.add_argument("--model", default="models/detail_cnn.pt")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--val", type=int, default=30, help="fotos de validación para elegir la nitidez clásica")
+    ap.add_argument("--dataset", default="bsds500", choices=["bsds500", "div2k"])
     args = ap.parse_args()
     root = data.ROOT
     net, meta = M.load(root / args.model)
     esrgan = external.load_esrgan() if external.ESRGAN_PATH.exists() else None
-    val, test = data.load_split("val", args.val), data.load_split("test", args.limit)
-    ex_dir = root / "results" / "examples_detail"
+    val = data.load_split("val", args.val, dataset=args.dataset)
+    test = data.load_split("test", args.limit, dataset=args.dataset)
+    tag = f"{Path(args.model).stem}_{args.dataset}"
+    out = root / "results" / "detail_eval"
+    ex_dir = out / f"examples_{tag}"
     ex_dir.mkdir(parents=True, exist_ok=True)
     rows, summary, amounts, t0 = [], {}, {}, time.time()
     for cond, degrade in CONDITIONS.items():
@@ -85,23 +89,22 @@ def main() -> None:
         summary[cond] = res
         print(f"{cond:10s}" + "".join(f" | {m} {res[m]['psnr']:.2f}/{res[m]['ssim']:.3f}" for m in methods)
               + f" | CNN mejora {res['cnn_mejora_la_foto_en']}", flush=True)
-    out = root / "results"
-    with open(out / "detail_test_metrics.csv", "w", newline="", encoding="utf-8") as f:
+    with open(out / f"{tag}.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=rows[0].keys(), lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
-    info = {"model": args.model, "model_epoch": meta.get("epoch"), "test_images": len(test),
+    info = {"model": args.model, "dataset": args.dataset, "model_epoch": meta.get("epoch"), "test_images": len(test),
             "nitidez_clasica_elegida_en_validacion": amounts, "seconds": round(time.time() - t0, 1), "results": summary}
-    (out / "detail_test_summary.json").write_text(json.dumps(info, indent=1), "utf-8")
+    (out / f"{tag}.json").write_text(json.dumps(info, indent=1), "utf-8")
     methods = list(next(iter(summary.values())).keys())[:-1]
     lines = ["| Condición | " + " | ".join(methods) + " | CNN mejora la foto |", "|" + "---|" * (len(methods) + 2)]
     for cond, res in summary.items():
         lines.append(f"| {cond} | " + " | ".join(f"{res[m]['psnr']:.2f} dB / {res[m]['ssim']:.3f}" for m in methods)
                      + f" | {res['cnn_mejora_la_foto_en']} |")
-    (out / "detail_test_summary.md").write_text(
-        f"CNN de detalle en {len(test)} fotos de prueba (BSDS500). PSNR medio / SSIM medio. Real-ESRGAN es externo y generativo.\n\n"
+    (out / f"{tag}.md").write_text(
+        f"{args.model} en {len(test)} fotos de prueba ({args.dataset}). PSNR medio / SSIM medio. Real-ESRGAN es externo y generativo.\n\n"
         + "\n".join(lines) + "\n", "utf-8")
-    print(f"{len(test)} fotos de prueba en {time.time() - t0:.0f} s -> results/detail_test_summary.md")
+    print(f"{len(test)} fotos de prueba en {time.time() - t0:.0f} s -> results/detail_eval/{tag}.md")
 
 
 if __name__ == "__main__":

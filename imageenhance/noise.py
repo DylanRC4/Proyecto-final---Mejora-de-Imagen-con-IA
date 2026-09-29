@@ -54,6 +54,19 @@ def add_downscale(img: np.ndarray, factor: float) -> np.ndarray:
     return np.clip(cv2.resize(small, (w, h), interpolation=cv2.INTER_CUBIC), 0.0, 1.0).astype(np.float32)
 
 
+def add_exposure(img: np.ndarray, ev: float) -> np.ndarray:
+    """Sub/sobreexposición física: pasa a luz LINEAL (se deshace la curva sRGB), multiplica la luz por
+    2^ev y vuelve a sRGB. −2 EV = la cuarta parte de la luz. Lo que pasa de 1 se satura (se quema)."""
+    lin = np.where(img <= 0.04045, img / 12.92, ((img + 0.055) / 1.055) ** 2.4) * 2.0 ** ev
+    lin = np.clip(lin, 0.0, 1.0)
+    return np.where(lin <= 0.0031308, 12.92 * lin, 1.055 * np.maximum(lin, 0.0031308) ** (1 / 2.4) - 0.055).astype(np.float32)
+
+
+def add_cast(img: np.ndarray, gains=(0.8, 1.0, 1.15)) -> np.ndarray:
+    """Dominante de color: ganancias por canal B, G, R (por defecto, luz cálida: menos azul, más rojo)."""
+    return np.clip(img * np.asarray(gains, np.float32), 0.0, 1.0)
+
+
 def random_detail(img: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     """Degradación aleatoria para entrenar la CNN de DETALLE, en el orden de una cámara real:
     lente (desenfoque) → sensor (baja resolución, algo de ruido) → compresión (JPEG).
@@ -68,6 +81,27 @@ def random_detail(img: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     if rng.random() < 0.6:
         x = add_jpeg(x, int(rng.integers(10, 61)))
     return x
+
+
+def random_detail_v2(img: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """Mezcla EQUILIBRADA (versión 2). La v1 aplicaba desenfoque al 70 % de los ejemplos y la red
+    aprendió a "afilar" siempre, empeorando fotos que solo tenían JPEG. Aquí cada caso tiene su cuota:
+      10 % foto limpia (aprender a no tocar) | 20 % solo desenfoque | 20 % solo JPEG
+      15 % solo baja resolución              | 35 % combinación (random_detail)"""
+    u = rng.random()
+    if u < 0.10:
+        return img.copy()
+    if u < 0.30:
+        return add_blur(img, rng.uniform(0.5, 2.5))
+    if u < 0.50:
+        return add_jpeg(img, int(rng.integers(10, 81)))
+    if u < 0.65:
+        return add_downscale(img, float(rng.choice([1.5, 2.0, 3.0])))
+    return random_detail(img, rng)
+
+
+VAL_DETAIL = [lambda x: add_jpeg(add_downscale(add_blur(x, 1.0), 2.0), 35), lambda x: add_blur(x, 1.5),
+              lambda x: add_jpeg(x, 20), lambda x: add_downscale(x, 2.0)]
 
 
 def fixed_detail(img: np.ndarray) -> np.ndarray:

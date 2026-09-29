@@ -43,7 +43,8 @@ def make_epoch(train_imgs, cfg, epoch):
     clean = np.concatenate([data.random_patches(im, cfg["patches_per_image"], cfg["patch"], rng) for _, im in train_imgs])
     clean = clean[rng.permutation(len(clean))].astype(np.float32) / 255.0
     if cfg.get("task", "noise") == "detail":
-        noisy = np.stack([noise.random_detail(p, rng) for p in clean])
+        degrade = noise.random_detail_v2 if cfg.get("detail_mix") == "v2" else noise.random_detail
+        noisy = np.stack([degrade(p, rng) for p in clean])
     else:
         sigma = rng.uniform(cfg["sigma_min"], cfg["sigma_max"], (len(clean), 1, 1, 1)).astype(np.float32) / 255.0
         noisy = np.clip(clean + rng.standard_normal(clean.shape, dtype=np.float32) * sigma, 0.0, 1.0)
@@ -53,11 +54,13 @@ def make_epoch(train_imgs, cfg, epoch):
 def build_val(cfg, limit=None):
     c = cfg["val_crop"]
     clean, noisy = [], []
-    for name, im in data.load_split("val", limit):
+    for i, (name, im) in enumerate(data.load_split("val", limit, dataset=cfg.get("dataset", "bsds500"))):
         y, x = (im.shape[0] - c) // 2, (im.shape[1] - c) // 2
         crop = im[y:y + c, x:x + c]
         clean.append(crop)
-        if cfg.get("task", "noise") == "detail":
+        if cfg.get("task", "noise") == "detail" and cfg.get("detail_mix") == "v2":
+            noisy.append(noise.VAL_DETAIL[i % 4](crop))  # validación equilibrada: rota entre 4 casos fijos
+        elif cfg.get("task", "noise") == "detail":
             noisy.append(noise.fixed_detail(crop))
         else:
             s = cfg["val_sigma"]
@@ -96,7 +99,7 @@ def main() -> None:
     torch.manual_seed(cfg["seed"])
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    train_imgs = data.load_split("train", args.limit, as_float=False)
+    train_imgs = data.load_split("train", args.limit, as_float=False, dataset=cfg.get("dataset", "bsds500"))
     val = build_val(cfg, args.limit)
     net = M.DenoiseCNN(3, cfg["features"], cfg["depth"]).to(device)
     opt = torch.optim.Adam(net.parameters(), lr=cfg["lr"])
@@ -141,7 +144,9 @@ def main() -> None:
     print(f"Validación sin restaurar ({cfg.get('task', 'noise')}): PSNR {noisy_psnr:.2f} dB | SSIM {noisy_ssim:.4f}")
     env = {"python": platform.python_version(), "torch": torch.__version__, "threads": torch.get_num_threads(),
            "device": device, "platform": platform.platform(), "processor": platform.processor(),
-           "dataset_commit": json.loads(data.MANIFEST.read_text("utf-8"))["commit"], "params": M.count_params(net),
+           "dataset": cfg.get("dataset", "bsds500"),
+           "dataset_source": json.loads(data.DATASETS[cfg.get("dataset", "bsds500")][1].read_text("utf-8")).get("source"),
+           "params": M.count_params(net),
            "train_images": len(train_imgs), "val_images": len(val[0]),
            "val_noisy_psnr": round(float(noisy_psnr), 4), "val_noisy_ssim": round(float(noisy_ssim), 4)}
     t_start = time.time()
